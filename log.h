@@ -7,8 +7,21 @@
 #include <fstream>
 #include <cstdint>
 #include <string>
+#include <ctime>
 
 namespace cpplog {
+  // ANSI color codes for colorful logging
+  static const char* ANSI_RED     = "\033[31m";
+  static const char* ANSI_GREEN   = "\033[32m";
+  static const char* ANSI_YELLOW  = "\033[33m";
+  static const char* ANSI_DEFAULT = "\033[39m";
+
+  // buffer for current time
+  static char time_str[sizeof("hh:mm:ss")];
+
+  // start time of program
+  // (will be used to calculate current time whenever a timestamp is logged)
+  static std::time_t start_time = std::time(nullptr);
 
   // available format flags for a log message
   enum LogFmt {
@@ -24,53 +37,95 @@ namespace cpplog {
 
   // available log levels (also compliant with a valid log format)
   enum Level {
-    STANDARD = NEWLINE | TIMESTAMP | HIGHLIGHT_GREEN,
-    DEBUG    = NEWLINE | TIMESTAMP | HIGHLIGHT_GREEN | TYPE_SIZE
+    STANDARD = NEWLINE | TIMESTAMP,
+    DEBUG    = NEWLINE | TIMESTAMP | TYPE_SIZE
   };
 
   typedef uint64_t LogFormat;
 
-  // initialize the log msg based on the log format options
-  // that are indenpendent of the type that is supposed to be logged
-  static void parse_fmt_opts(std::ostream &stream, LogFormat fmt) {
-    if (fmt & LogFmt::TIMESTAMP) {
-    } else if (fmt & LogFmt::HIGHLIGHT_GREEN) {
+  /*
+   * initialize the log msg based on the log format options;
+   * the passed type needs to have an operator<< overload and will be
+   * passed directly into the stream, so this function is best only
+   * used for primitive types
+   */
+  template<typename T>
+  static void parse_fmt_opts(std::ostream &stream, const T &t, LogFormat fmt) {
+    // set color of text
+    if (fmt & LogFmt::HIGHLIGHT_GREEN) {
+      stream << ANSI_GREEN;
     } else if (fmt & LogFmt::HIGHLIGHT_YELLOW) {
+      stream << ANSI_YELLOW;
     } else if (fmt & LogFmt::HIGHLIGHT_RED) {
+      stream << ANSI_RED;
     }
-  }
 
-  // log (unsinged) integer types
-  static void log(std::ostream &stream, int x, LogFormat fmt) {
-    parse_fmt_opts(stream, fmt);
-    stream << x;
-    if (fmt & LogFmt::NEWLINE) {
-      stream << '\n';
+    if (fmt & LogFmt::TIMESTAMP) {
+      std::strftime(time_str, sizeof(time_str),
+                    "%T", std::localtime(&start_time));
+      stream << "[" << time_str << "] ";
     }
-  }
 
-  // log floating point types
-  static void log(std::ostream &stream, double x, LogFormat fmt) {
-    parse_fmt_opts(stream, fmt);
-    stream << x;
+    // add type to stream (without any special formatting)
+    stream << t;
+
+    if (fmt & LogFmt::TYPE_SIZE) {
+      stream << " (SIZE = " << sizeof(t) << " bytes)";
+    }
+
+    // reset to default colors again
+    stream << ANSI_DEFAULT;
+
     if (fmt & LogFmt::NEWLINE) {
       stream << '\n';
     }
   }
 
   /*
-   * The Logger class contains a reference to std::cerr, which
-   * is the output stream for all logged messages;
-   * you can specify the log level and log format of the
-   * to-be-logged messages using the set_log_level and
-   * set_log_format methods; this class contains methods that
-   * support the logging of all primitive and most std library types;
-   * if you wish to log your own custom types, please provide
-   * a "void log(YourCustomType t)" definition that specifies
-   * how that type should be logged; the logging mechanism
-   * of this class will then use your custom "log" overload
-   * to log this type
+   * initialize the log msg based on the log format options;
+   * this will only set the color of the log msg as well as add
+   * the timestamp (if specified)
    */
+  static void init_log_msg(std::ostream &stream, LogFormat fmt) {
+    // set color of text
+    if (fmt & LogFmt::HIGHLIGHT_GREEN) {
+      stream << ANSI_GREEN;
+    } else if (fmt & LogFmt::HIGHLIGHT_YELLOW) {
+      stream << ANSI_YELLOW;
+    } else if (fmt & LogFmt::HIGHLIGHT_RED) {
+      stream << ANSI_RED;
+    }
+
+    if (fmt & LogFmt::TIMESTAMP) {
+      std::strftime(time_str, sizeof(time_str),
+                    "%T", std::localtime(&start_time));
+      stream << "[" << time_str << "] ";
+    }
+  }
+
+  // log (unsigned) integer types
+  static void log(std::ostream &stream, int x, LogFormat fmt) {
+    parse_fmt_opts(stream, x, fmt);
+  }
+
+  // log floating point types
+  static void log(std::ostream &stream, double x, LogFormat fmt) {
+    parse_fmt_opts(stream, x, fmt);
+  }
+
+/*
+ * The Logger class contains a reference to std::cerr, which
+ * is the output stream for all logged messages;
+ * you can specify the log level and log format of the
+ * to-be-logged messages using the set_log_level and
+ * set_log_format methods; this class contains methods that
+ * support the logging of all primitive and most std library types;
+ * if you wish to log your own custom types, please provide
+ * a "void log(YourCustomType t)" definition that specifies
+ * how that type should be logged; the logging mechanism
+ * of this class will then use your custom "log" overload
+ * to log this type
+ */
 class Logger {
  private:
   Level _log_lvl;
@@ -107,31 +162,45 @@ class Logger {
 
   ~Logger() {}
 
+  // set log level
   void set_log_level(Level lvl) {
     _log_lvl = lvl;
-    switch (_log_lvl) {
-      case Level::STANDARD: break;
-      case Level::DEBUG: break;
-    }
+    _log_format = _log_lvl;
   }
 
+  // specify log format (see LogFmt enum for available options)
   void set_log_format(LogFormat fmt) {
     _log_format = fmt;
   }
 
   template<typename T>
-  void error(const T &t, LogFormat fmt = _default_err_fmt) {
-    log(_stream, t, fmt);
+  void error(const T &t, LogFormat fmt) {
+    log(_stream, t, fmt | _default_err_fmt);
   }
 
   template<typename T>
-  void warn(const T &t, LogFormat fmt = _default_warn_fmt) {
-    log(_stream, t, fmt);
+  void error(const T &t) {
+    log(_stream, t, _log_format | _default_err_fmt);
   }
 
   template<typename T>
-  void info(const T &t, LogFormat fmt = _default_info_fmt) {
-    log(_stream, t, fmt);
+  void warn(const T &t, LogFormat fmt) {
+    log(_stream, t, fmt | _default_warn_fmt);
+  }
+
+  template<typename T>
+  void warn(const T &t) {
+    log(_stream, t, _log_format | _default_warn_fmt);
+  }
+
+  template<typename T>
+  void info(const T &t, LogFormat fmt) {
+    log(_stream, t, fmt | _default_info_fmt);
+  }
+
+  template<typename T>
+  void info(const T &t) {
+    log(_stream, t, _log_format | _default_info_fmt);
   }
 };
 
