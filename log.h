@@ -7,6 +7,7 @@
 #include <fstream>
 #include <cstdint>
 #include <string>
+#include <cstring>
 #include <ctime>
 
 namespace cpplog {
@@ -30,7 +31,7 @@ namespace cpplog {
     HIGHLIGHT_RED    = 1 << 2,  // highlight the log msg red
     HIGHLIGHT_GREEN  = 1 << 3,  // highlight the log msg green
     HIGHLIGHT_YELLOW = 1 << 4,  // highlight the log msg yellow
-    VERBOSE          = 1 << 5,  // print entire content of type
+    VERBOSE          = 1 << 5,  // print entire content (for container-like)
     TYPE_SIZE        = 1 << 6,  // print (estimated) size of type
     END              = 1 << 7   // end marker
   };
@@ -50,7 +51,8 @@ namespace cpplog {
    * used for primitive types
    */
   template<typename T>
-  static void parse_fmt_opts(std::ostream &stream, const T &t, LogFormat fmt) {
+  static void parse_fmt_opts(std::ostream &stream, const T &t,
+                             LogFormat fmt, size_t type_size = 0) {
     // set color of text
     if (fmt & LogFmt::HIGHLIGHT_GREEN) {
       stream << ANSI_GREEN;
@@ -69,8 +71,15 @@ namespace cpplog {
     // add type to stream (without any special formatting)
     stream << t;
 
+    // print estimtated size of type (in bytes)
     if (fmt & LogFmt::TYPE_SIZE) {
-      stream << " (SIZE = " << sizeof(t) << " bytes)";
+      stream << " (SIZE = ";
+      if (type_size) {
+        stream << type_size;
+      } else {
+        stream << sizeof(t);
+      }
+      stream << " bytes)";
     }
 
     // reset to default colors again
@@ -111,6 +120,43 @@ namespace cpplog {
   // log floating point types
   static void log(std::ostream &stream, double x, LogFormat fmt) {
     parse_fmt_opts(stream, x, fmt);
+  }
+
+  // log characters
+  static void log(std::ostream &stream, char c, LogFormat fmt) {
+    parse_fmt_opts(stream, c, fmt);
+  }
+
+  // log C strings and std::string
+  static void log(std::ostream &stream, const std::string &str, LogFormat fmt) {
+    size_t str_len = str.size();
+
+    if (fmt & LogFmt::VERBOSE || str_len < 20) {
+      parse_fmt_opts(stream, str, fmt, str_len);
+    } else {
+      // if a string is longer than 20 characters,
+      // print shortened version of it
+      char formatted_str[64];
+      int pos = std::snprintf(formatted_str,
+                              sizeof(formatted_str), "String: \"");
+
+      int mx_border = 8;
+      for (int i = 0; i < mx_border; ++i, ++pos) {
+        formatted_str[pos] = str[i];
+      }
+
+      formatted_str[pos++] = '.';
+      formatted_str[pos++] = '.';
+
+      for (size_t i = str_len - mx_border; i < str_len; ++i, ++pos) {
+        formatted_str[pos] = str[i];
+      }
+
+      formatted_str[pos++] = '"';
+      formatted_str[pos] = '\0';
+
+      parse_fmt_opts(stream, formatted_str, fmt);
+    }
   }
 
 /*
@@ -155,7 +201,7 @@ class Logger {
   }
 
   Logger(const char *name, Level lvl, LogFormat fmt) :
-    _stream(std::cerr), _log_lvl(lvl), _log_format(fmt), _name(name) {
+    _log_lvl(lvl), _stream(std::cerr), _name(name), _log_format(fmt) {
     set_log_level(lvl);
     set_log_format(fmt);
   }
