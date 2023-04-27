@@ -7,11 +7,17 @@
 #include <sstream>
 #include <fstream>
 #include <cstdint>
-#include <string>
 #include <cstring>
 #include <ctime>
+
+// ### types that can be logged by default: ###
+// all primitive types
+#include <string>
 #include <vector>
 #include <array>
+#include <map>
+#include <unordered_map>
+// ############################################
 
 namespace cpplog {
 
@@ -71,6 +77,50 @@ static std::ostream &operator<<(std::ostream &stream,
     stream << ", " << arr[i];
   }
   stream << "] ";
+
+  return stream;
+}
+
+template<typename K, typename V>
+static std::ostream &operator<<(std::ostream &stream,
+                                const std::map<K, V> &map) {
+  if (map.empty()) {
+    stream << "map: {} ";
+    return stream;
+  }
+
+  stream << "map: {";
+  auto map_it = map.cbegin();
+  stream << map_it->first << ": " << map_it->second;
+  ++map_it;
+
+  for (; map_it != map.cend(); ++map_it) {
+    stream << ", " << map_it->first << ": " << map_it->second;
+  }
+
+  stream << "} ";
+
+  return stream;
+}
+
+template<typename K, typename V>
+static std::ostream &operator<<(std::ostream &stream,
+                                const std::unordered_map<K, V> &map) {
+  if (map.empty()) {
+    stream << "unordered_map: {} ";
+    return stream;
+  }
+
+  stream << "unordered_map: {";
+  auto map_it = map.cbegin();
+  stream << map_it->first << ": " << map_it->second;
+  ++map_it;
+
+  for (; map_it != map.cend(); ++map_it) {
+    stream << ", " << map_it->first << ": " << map_it->second;
+  }
+
+  stream << "} ";
 
   return stream;
 }
@@ -245,6 +295,89 @@ class LoggerImpl {
       formatted_arr << "] ";
 
       parse_fmt_opts(stream, formatted_arr.rdbuf(), fmt, size_in_bytes);
+    }
+  }
+
+  // log std::map
+  template<typename K, typename V>
+  void log(std::ostream &stream, const std::map<K, V> &map, LogFormat fmt) {
+    size_t size = map.size();
+    size_t mx_size = 8;
+    size_t size_in_bytes = size * sizeof(K) + size * sizeof(V);  // estimate
+
+    if (fmt & LogFmt::VERBOSE || size < mx_size) {
+      parse_fmt_opts(stream, map, fmt, size_in_bytes);
+    } else {
+      // if a map contains more than mx_size key-value pairs,
+      // print shortened version of it
+      std::stringstream formatted_map;
+      auto map_it = map.cbegin();
+      size_t left_start = 1;
+      formatted_map << "map: {";
+      formatted_map << map_it->first << ": " << map_it->second;
+      ++map_it;
+
+      for (; left_start < mx_size / 2; ++map_it, ++left_start) {
+        formatted_map << ", " << map_it->first << ": " << map_it->second;
+      }
+
+      formatted_map << " ... ";
+      size_t skip_c = (size - (mx_size / 2)) - left_start;
+      std::advance(map_it, skip_c);
+      left_start += skip_c;
+
+      formatted_map << map_it->first << ": " << map_it->second;
+      ++map_it;
+      ++left_start;
+
+      for (; left_start < size; ++map_it, ++left_start) {
+        formatted_map << ", " << map_it->first << ": " << map_it->second;
+      }
+      formatted_map << "} ";
+
+      parse_fmt_opts(stream, formatted_map.rdbuf(), fmt, size_in_bytes);
+    }
+  }
+
+  // log std::unordered_map
+  template<typename K, typename V>
+  void log(std::ostream &stream,
+           const std::unordered_map<K, V> &map, LogFormat fmt) {
+    size_t size = map.size();
+    size_t mx_size = 8;
+    size_t size_in_bytes = size * sizeof(K) + size * sizeof(V);  // estimate
+
+    if (fmt & LogFmt::VERBOSE || size < mx_size) {
+      parse_fmt_opts(stream, map, fmt, size_in_bytes);
+    } else {
+      // if an unordered map contains more than mx_size key-value pairs,
+      // print shortened version of it
+      std::stringstream formatted_map;
+      auto map_it = map.cbegin();
+      size_t left_start = 1;
+      formatted_map << "unordered_map: {";
+      formatted_map << map_it->first << ": " << map_it->second;
+      ++map_it;
+
+      for (; left_start < mx_size / 2; ++map_it, ++left_start) {
+        formatted_map << ", " << map_it->first << ": " << map_it->second;
+      }
+
+      formatted_map << " ... ";
+      size_t skip_c = (size - (mx_size / 2)) - left_start;
+      std::advance(map_it, skip_c);
+      left_start += skip_c;
+
+      formatted_map << map_it->first << ": " << map_it->second;
+      ++map_it;
+      ++left_start;
+
+      for (; left_start < size; ++map_it, ++left_start) {
+        formatted_map << ", " << map_it->first << ": " << map_it->second;
+      }
+      formatted_map << "} ";
+
+      parse_fmt_opts(stream, formatted_map.rdbuf(), fmt, size_in_bytes);
     }
   }
 };
