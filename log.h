@@ -69,6 +69,7 @@ static const char *ANSI_GREEN   = "\033[32m";
 static const char *ANSI_YELLOW  = "\033[33m";
 static const char *ANSI_DEFAULT = "\033[39m";
 
+// ### operator<< overloads for most std library types ###
 template<typename T>
 static std::ostream &operator<<(std::ostream &stream,
                                 const std::vector<T> &vec) {
@@ -147,6 +148,14 @@ static std::ostream &operator<<(std::ostream &stream,
   return stream;
 }
 
+/*
+ * specifies how a certain datatype should be logged;
+ * defines a "void log(std::ostream &stream, CustomType t, LogFormat fmt)"
+ * method for every loggable type;
+ * this class should be extend if you wish to add log definitions
+ * for you own custom types as the main "Logger" class will always
+ * call a "log" method of whatever LogImpl object it owns
+ */
 class LoggerImpl {
  public:
   // buffer for current time
@@ -166,7 +175,7 @@ class LoggerImpl {
    */
   template<typename T>
   void parse_fmt_opts(std::ostream &stream, const T &t,
-                             LogFormat fmt, size_t type_size = 0) {
+                      LogFormat fmt, size_t type_size = 0) {
     // set color of text
     if (fmt & LogFmt::HIGHLIGHT_GREEN) {
       stream << ANSI_GREEN;
