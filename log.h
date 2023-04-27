@@ -11,38 +11,44 @@
 #include <ctime>
 
 namespace cpplog {
-  // ANSI color codes for colorful logging
-  static const char* ANSI_RED     = "\033[31m";
-  static const char* ANSI_GREEN   = "\033[32m";
-  static const char* ANSI_YELLOW  = "\033[33m";
-  static const char* ANSI_DEFAULT = "\033[39m";
 
+// available format flags for a log message
+enum LogFmt {
+  NEWLINE          = 1 << 0,  // append newline at the end of the log msg
+  TIMESTAMP        = 1 << 1,  // add system time at the beginning of log msg
+  HIGHLIGHT_RED    = 1 << 2,  // highlight the log msg red
+  HIGHLIGHT_GREEN  = 1 << 3,  // highlight the log msg green
+  HIGHLIGHT_YELLOW = 1 << 4,  // highlight the log msg yellow
+  VERBOSE          = 1 << 5,  // print entire content (for container-like)
+  TYPE_SIZE        = 1 << 6,  // print (estimated) size of type
+  END              = 1 << 7   // end marker
+};
+
+// available log levels (also compliant with a valid log format)
+enum Level {
+  STANDARD = NEWLINE | TIMESTAMP,
+  DEBUG    = NEWLINE | TIMESTAMP | TYPE_SIZE
+};
+
+typedef uint64_t LogFormat;
+
+// ANSI color codes for colorful logging
+static const char *ANSI_RED     = "\033[31m";
+static const char *ANSI_GREEN   = "\033[32m";
+static const char *ANSI_YELLOW  = "\033[33m";
+static const char *ANSI_DEFAULT = "\033[39m";
+
+class LoggerImpl {
+ public:
   // buffer for current time
-  static char time_str[sizeof("hh:mm:ss")];
+  char time_str[sizeof("hh:mm:ss")];
 
   // start time of program
   // (will be used to calculate current time whenever a timestamp is logged)
-  static std::time_t start_time = std::time(nullptr);
+  std::time_t start_time;
 
-  // available format flags for a log message
-  enum LogFmt {
-    NEWLINE          = 1 << 0,  // append newline at the end of the log msg
-    TIMESTAMP        = 1 << 1,  // add system time at the beginning of log msg
-    HIGHLIGHT_RED    = 1 << 2,  // highlight the log msg red
-    HIGHLIGHT_GREEN  = 1 << 3,  // highlight the log msg green
-    HIGHLIGHT_YELLOW = 1 << 4,  // highlight the log msg yellow
-    VERBOSE          = 1 << 5,  // print entire content (for container-like)
-    TYPE_SIZE        = 1 << 6,  // print (estimated) size of type
-    END              = 1 << 7   // end marker
-  };
-
-  // available log levels (also compliant with a valid log format)
-  enum Level {
-    STANDARD = NEWLINE | TIMESTAMP,
-    DEBUG    = NEWLINE | TIMESTAMP | TYPE_SIZE
-  };
-
-  typedef uint64_t LogFormat;
+  LoggerImpl() :
+    start_time(std::time(nullptr)) {}
 
   /*
    * initialize the log msg based on the log format options;
@@ -51,7 +57,7 @@ namespace cpplog {
    * used for primitive types
    */
   template<typename T>
-  static void parse_fmt_opts(std::ostream &stream, const T &t,
+  void parse_fmt_opts(std::ostream &stream, const T &t,
                              LogFormat fmt, size_t type_size = 0) {
     // set color of text
     if (fmt & LogFmt::HIGHLIGHT_GREEN) {
@@ -95,7 +101,7 @@ namespace cpplog {
    * this will only set the color of the log msg as well as add
    * the timestamp (if specified)
    */
-  static void init_log_msg(std::ostream &stream, LogFormat fmt) {
+  void init_log_msg(std::ostream &stream, LogFormat fmt) {
     // set color of text
     if (fmt & LogFmt::HIGHLIGHT_GREEN) {
       stream << ANSI_GREEN;
@@ -113,22 +119,22 @@ namespace cpplog {
   }
 
   // log (unsigned) integer types
-  static void log(std::ostream &stream, int x, LogFormat fmt) {
+  void log(std::ostream &stream, int x, LogFormat fmt) {
     parse_fmt_opts(stream, x, fmt);
   }
 
   // log floating point types
-  static void log(std::ostream &stream, double x, LogFormat fmt) {
+  void log(std::ostream &stream, double x, LogFormat fmt) {
     parse_fmt_opts(stream, x, fmt);
   }
 
   // log characters
-  static void log(std::ostream &stream, char c, LogFormat fmt) {
+  void log(std::ostream &stream, char c, LogFormat fmt) {
     parse_fmt_opts(stream, c, fmt);
   }
 
   // log C strings and std::string
-  static void log(std::ostream &stream, const std::string &str, LogFormat fmt) {
+  void log(std::ostream &stream, const std::string &str, LogFormat fmt) {
     size_t str_len = str.size();
 
     if (fmt & LogFmt::VERBOSE || str_len < 20) {
@@ -158,6 +164,7 @@ namespace cpplog {
       parse_fmt_opts(stream, formatted_str, fmt);
     }
   }
+};
 
 /*
  * The Logger class contains a reference to std::cerr, which
@@ -166,18 +173,23 @@ namespace cpplog {
  * to-be-logged messages using the set_log_level and
  * set_log_format methods; this class contains methods that
  * support the logging of all primitive and most std library types;
- * if you wish to log your own custom types, please provide
- * a "void log(YourCustomType t)" definition that specifies
- * how that type should be logged; the logging mechanism
- * of this class will then use your custom "log" overload
- * to log this type
+ * if you wish to log your own custom types, please extend the
+ * "LoggerImpl" class and add your own "void log(YourCustomType t)"
+ * definitions that specify how your custom types should be logged
+ * and provide your extension of the LoggerImpl class as the template
+ * class for the Logger class;
+ * the Logger class will take ownership of the LoggerImpl object,
+ * so be aware that it will be deleted whenever the Logger class
+ * get deleted
  */
+template<class LogImpl = LoggerImpl>
 class Logger {
  private:
   Level _log_lvl;
   std::ostream &_stream;
   std::string _name;
   LogFormat _log_format;
+  LogImpl *_log_impl;
 
   // default log formats for error, warning and info messages
   static const LogFormat _default_err_fmt =
@@ -192,21 +204,27 @@ class Logger {
     _stream(std::cerr) {
     set_log_level(Level::STANDARD);
     set_log_format(Level::STANDARD);
+    _log_impl = new LogImpl();
   }
 
-  Logger(const char *name) :
+  Logger(const char *name, LogImpl *log_impl = nullptr) :
     _stream(std::cerr), _name(name) {
     set_log_level(Level::STANDARD);
     set_log_format(Level::STANDARD);
+    set_log_impl(log_impl);
   }
 
-  Logger(const char *name, Level lvl, LogFormat fmt) :
+  Logger(const char *name, Level lvl,
+         LogFormat fmt, LogImpl *log_impl = nullptr) :
     _log_lvl(lvl), _stream(std::cerr), _name(name), _log_format(fmt) {
     set_log_level(lvl);
     set_log_format(fmt);
+    set_log_impl(log_impl);
   }
 
-  ~Logger() {}
+  ~Logger() {
+    delete _log_impl;
+  }
 
   // set log level
   void set_log_level(Level lvl) {
@@ -219,43 +237,68 @@ class Logger {
     _log_format = fmt;
   }
 
+  /*
+   * set the log implementation object;
+   * the Logger class will take ownership of the LogImpl object,
+   * so be aware that it will be deleted whenever the Logger class
+   * get deleted
+   */
+  void set_log_impl(LogImpl *log_impl) {
+    // if log implementation already exists, delete it first
+    if (_log_impl) {
+      delete _log_impl;
+    }
+
+    // if a valid ptr was passed, simply take ownership;
+    // else, create a new log implementation object
+    if (log_impl) {
+      _log_impl = log_impl;
+    } else {
+      _log_impl = new LogImpl();
+    }
+  }
+
   template<typename T>
   void error(const T &t, LogFormat fmt) {
-    log(_stream, t, fmt | _default_err_fmt);
+    _log_impl->log(_stream, t, fmt | _default_err_fmt);
   }
 
   template<typename T>
   void error(const T &t) {
-    log(_stream, t, _log_format | _default_err_fmt);
+    _log_impl->log(_stream, t, _log_format | _default_err_fmt);
   }
 
   template<typename T>
   void warn(const T &t, LogFormat fmt) {
-    log(_stream, t, fmt | _default_warn_fmt);
+    _log_impl->log(_stream, t, fmt | _default_warn_fmt);
   }
 
   template<typename T>
   void warn(const T &t) {
-    log(_stream, t, _log_format | _default_warn_fmt);
+    _log_impl->log(_stream, t, _log_format | _default_warn_fmt);
   }
 
   template<typename T>
   void info(const T &t, LogFormat fmt) {
-    log(_stream, t, fmt | _default_info_fmt);
+    _log_impl->log(_stream, t, fmt | _default_info_fmt);
   }
 
   template<typename T>
   void info(const T &t) {
-    log(_stream, t, _log_format | _default_info_fmt);
+    _log_impl->log(_stream, t, _log_format | _default_info_fmt);
   }
 };
 
-inline Logger* create_log(const char *name) {
-  return new Logger(name);
+template<class LogImpl = LoggerImpl>
+inline Logger<LogImpl>* create_log(const char *name,
+                                   LogImpl *log_impl = nullptr) {
+  return new Logger(name, log_impl);
 }
 
-inline Logger* create_log(const char *name, Level lvl, LogFormat fmt) {
-  return new Logger(name, lvl, fmt);
+template<class LogImpl = LoggerImpl>
+inline Logger<LogImpl>* create_log(const char *name, Level lvl,
+                                   LogFormat fmt, LogImpl *log_impl) {
+  return new Logger(name, lvl, fmt, log_impl);
 }
 
 }  // namespace cpplog
