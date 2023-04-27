@@ -4,11 +4,14 @@
 #include <memory>
 #include <mutex>
 #include <iostream>
+#include <sstream>
 #include <fstream>
 #include <cstdint>
 #include <string>
 #include <cstring>
 #include <ctime>
+#include <vector>
+#include <array>
 
 namespace cpplog {
 
@@ -38,6 +41,40 @@ static const char *ANSI_GREEN   = "\033[32m";
 static const char *ANSI_YELLOW  = "\033[33m";
 static const char *ANSI_DEFAULT = "\033[39m";
 
+template<typename T>
+static std::ostream &operator<<(std::ostream &stream,
+                                const std::vector<T> &vec) {
+  if (vec.empty()) {
+    stream << "vector: [] ";
+    return stream;
+  }
+
+  stream << "vector: [" << vec[0];
+  for (size_t i = 1; i < vec.size(); ++i) {
+    stream << ", " << vec[i];
+  }
+  stream << "] ";
+
+  return stream;
+}
+
+template<typename T, size_t SIZE>
+static std::ostream &operator<<(std::ostream &stream,
+                                const std::array<T, SIZE> &arr) {
+  if (arr.empty()) {
+    stream << "array: [] ";
+    return stream;
+  }
+
+  stream << "array: [" << arr[0];
+  for (size_t i = 1; i < arr.size(); ++i) {
+    stream << ", " << arr[i];
+  }
+  stream << "] ";
+
+  return stream;
+}
+
 class LoggerImpl {
  public:
   // buffer for current time
@@ -52,9 +89,8 @@ class LoggerImpl {
 
   /*
    * initialize the log msg based on the log format options;
-   * the passed type needs to have an operator<< overload and will be
-   * passed directly into the stream, so this function is best only
-   * used for primitive types
+   * the passed type needs to have an operator<< overload and
+   * will be passed directly into the stream
    */
   template<typename T>
   void parse_fmt_opts(std::ostream &stream, const T &t,
@@ -96,28 +132,6 @@ class LoggerImpl {
     }
   }
 
-  /*
-   * initialize the log msg based on the log format options;
-   * this will only set the color of the log msg as well as add
-   * the timestamp (if specified)
-   */
-  void init_log_msg(std::ostream &stream, LogFormat fmt) {
-    // set color of text
-    if (fmt & LogFmt::HIGHLIGHT_GREEN) {
-      stream << ANSI_GREEN;
-    } else if (fmt & LogFmt::HIGHLIGHT_YELLOW) {
-      stream << ANSI_YELLOW;
-    } else if (fmt & LogFmt::HIGHLIGHT_RED) {
-      stream << ANSI_RED;
-    }
-
-    if (fmt & LogFmt::TIMESTAMP) {
-      std::strftime(time_str, sizeof(time_str),
-                    "%T", std::localtime(&start_time));
-      stream << "[" << time_str << "] ";
-    }
-  }
-
   // log (unsigned) integer types
   void log(std::ostream &stream, int x, LogFormat fmt) {
     parse_fmt_opts(stream, x, fmt);
@@ -153,6 +167,8 @@ class LoggerImpl {
 
       formatted_str[pos++] = '.';
       formatted_str[pos++] = '.';
+      formatted_str[pos++] = '.';
+      formatted_str[pos++] = ' ';
 
       for (size_t i = str_len - mx_border; i < str_len; ++i, ++pos) {
         formatted_str[pos] = str[i];
@@ -162,6 +178,73 @@ class LoggerImpl {
       formatted_str[pos] = '\0';
 
       parse_fmt_opts(stream, formatted_str, fmt);
+    }
+  }
+
+  // log std::vector
+  template<typename T>
+  void log(std::ostream &stream, const std::vector<T> &vec, LogFormat fmt) {
+    size_t size = vec.size();
+    size_t mx_size = 10;
+    size_t size_in_bytes = size * sizeof(T);
+
+    if (fmt & LogFmt::VERBOSE || size < mx_size) {
+      parse_fmt_opts(stream, vec, fmt, size_in_bytes);
+    } else {
+      // if a vector contains more than mx_size elements,
+      // print shortened version of it
+      std::stringstream formatted_vec;
+      formatted_vec << "vector: [";
+      formatted_vec << vec[0];
+
+      for (size_t i = 1; i < mx_size / 2; ++i) {
+        formatted_vec << ", " << vec[i];
+      }
+
+      formatted_vec << " ... ";
+      size_t start = size - (mx_size / 2);
+      formatted_vec << vec[start++];
+
+      for (size_t i = start; i < size; ++i) {
+        formatted_vec << ", " << vec[i];
+      }
+      formatted_vec << "] ";
+
+      parse_fmt_opts(stream, formatted_vec.rdbuf(), fmt, size_in_bytes);
+    }
+  }
+
+  // log std::array
+  template<typename T, size_t SIZE>
+  void log(std::ostream &stream,
+           const std::array<T, SIZE> &arr, LogFormat fmt) {
+    size_t size = arr.size();
+    size_t mx_size = 10;
+    size_t size_in_bytes = size * sizeof(T);
+
+    if (fmt & LogFmt::VERBOSE || size < mx_size) {
+      parse_fmt_opts(stream, arr, fmt, size_in_bytes);
+    } else {
+      // if an array contains more than mx_size elements,
+      // print shortened version of it
+      std::stringstream formatted_arr;
+      formatted_arr << "array: [";
+      formatted_arr << arr[0];
+
+      for (size_t i = 1; i < mx_size / 2; ++i) {
+        formatted_arr << ", " << arr[i];
+      }
+
+      formatted_arr << " ... ";
+      size_t start = size - (mx_size / 2);
+      formatted_arr << arr[start++];
+
+      for (size_t i = start; i < size; ++i) {
+        formatted_arr << ", " << arr[i];
+      }
+      formatted_arr << "] ";
+
+      parse_fmt_opts(stream, formatted_arr.rdbuf(), fmt, size_in_bytes);
     }
   }
 };
