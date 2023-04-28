@@ -38,6 +38,7 @@
 #include <vector>
 #include <array>
 #include <map>
+#include <utility>  // for std::pair
 #include <unordered_map>
 // ############################################
 
@@ -150,6 +151,13 @@ static std::ostream &operator<<(std::ostream &stream,
   return stream;
 }
 
+template<typename T, typename U>
+static std::ostream &operator<<(std::ostream &stream,
+                                const std::pair<T, U> &pair) {
+  stream << "pair: {" << pair.first << ", " << pair.second << "} ";
+  return stream;
+}
+
 // ##########################################################
 
 /*
@@ -251,6 +259,12 @@ class LoggerImpl {
   // log characters
   void log(std::ostream &stream, char c, LogFormat fmt) {
     parse_fmt_opts(stream, c, fmt);
+  }
+
+  // log std::pair
+  template<typename T, typename U>
+  void log(std::ostream &stream, const std::pair<T, U> &p, LogFormat fmt) {
+    parse_fmt_opts(stream, p, fmt);
   }
 
   // log C strings and std::string
