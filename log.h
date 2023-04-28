@@ -50,26 +50,28 @@ enum LogFmt {
   HIGHLIGHT_RED    = 1 << 2,  // highlight the log msg red
   HIGHLIGHT_GREEN  = 1 << 3,  // highlight the log msg green
   HIGHLIGHT_YELLOW = 1 << 4,  // highlight the log msg yellow
-  VERBOSE          = 1 << 5,  // print entire content (for container-like)
-  TYPE_SIZE        = 1 << 6,  // print (estimated) size of type
-  END              = 1 << 7   // end marker
+  HIGHLIGHT_DEF    = 1 << 5,  // use default terminal color for log msg
+  VERBOSE          = 1 << 6,  // print entire content (for container-like)
+  TYPE_SIZE        = 1 << 7,  // print (estimated) size of type
+  NAME             = 1 << 8,  // print name of Logger
 };
 
 // available log levels (also compliant with a valid log format)
 enum Level {
   STANDARD = NEWLINE | TIMESTAMP,
-  DEBUG    = NEWLINE | TIMESTAMP | TYPE_SIZE
+  DEBUG    = NEWLINE | TIMESTAMP | TYPE_SIZE | NAME
 };
 
 typedef uint64_t LogFormat;
 
 // ANSI color codes for colorful logging
-static const char *ANSI_RED     = "\033[31m";
-static const char *ANSI_GREEN   = "\033[32m";
-static const char *ANSI_YELLOW  = "\033[33m";
-static const char *ANSI_DEFAULT = "\033[39m";
+static const char *__ansi_red     = "\033[31m";
+static const char *__ansi_green   = "\033[32m";
+static const char *__ansi_yellow  = "\033[33m";
+static const char *__ansi_default = "\033[39m";
 
 // ### operator<< overloads for most std library types ###
+
 template<typename T>
 static std::ostream &operator<<(std::ostream &stream,
                                 const std::vector<T> &vec) {
@@ -148,6 +150,8 @@ static std::ostream &operator<<(std::ostream &stream,
   return stream;
 }
 
+// ##########################################################
+
 /*
  * specifies how a certain datatype should be logged;
  * defines a "void log(std::ostream &stream, CustomType t, LogFormat fmt)"
@@ -157,7 +161,7 @@ static std::ostream &operator<<(std::ostream &stream,
  * call a "log" method of whatever LogImpl object it owns
  */
 class LoggerImpl {
- public:
+ private:
   // buffer for current time
   char time_str[sizeof("hh:mm:ss")];
 
@@ -165,8 +169,16 @@ class LoggerImpl {
   // (will be used to calculate current time whenever a timestamp is logged)
   std::time_t start_time;
 
+  // name of Logger (for easier differentiation when using multiple Loggers)
+  std::string name;
+
+ public:
   LoggerImpl() :
-    start_time(std::time(nullptr)) {}
+    start_time(std::time(nullptr)), name("") {}
+
+  void set_name(const std::string &_name) {
+    name = _name;
+  }
 
   /*
    * initialize the log msg based on the log format options;
@@ -178,17 +190,30 @@ class LoggerImpl {
                       LogFormat fmt, size_t type_size = 0) {
     // set color of text
     if (fmt & LogFmt::HIGHLIGHT_GREEN) {
-      stream << ANSI_GREEN;
+      stream << __ansi_green;
     } else if (fmt & LogFmt::HIGHLIGHT_YELLOW) {
-      stream << ANSI_YELLOW;
+      stream << __ansi_yellow;
     } else if (fmt & LogFmt::HIGHLIGHT_RED) {
-      stream << ANSI_RED;
+      stream << __ansi_red;
+    } else if (fmt & LogFmt::HIGHLIGHT_DEF) {
+      stream << __ansi_default;
     }
 
-    if (fmt & LogFmt::TIMESTAMP) {
-      std::strftime(time_str, sizeof(time_str),
-                    "%T", std::localtime(&start_time));
-      stream << "[" << time_str << "] ";
+    bool log_name      = fmt & LogFmt::NAME;
+    bool log_timestamp = fmt & LogFmt::TIMESTAMP;
+
+    std::strftime(time_str, sizeof(time_str),
+                  "%T", std::localtime(&start_time));
+
+    if (log_name && log_timestamp) {
+      stream << "[" << name << ", " << time_str << "] ";
+    } else {
+      if (fmt & LogFmt::NAME) {
+        stream << "[" << name << "] ";
+      }
+      if (fmt & LogFmt::TIMESTAMP) {
+        stream << "[" << time_str << "] ";
+      }
     }
 
     // add type to stream (without any special formatting)
@@ -196,7 +221,7 @@ class LoggerImpl {
 
     // print estimtated size of type (in bytes)
     if (fmt & LogFmt::TYPE_SIZE) {
-      stream << " (SIZE = ";
+      stream << " (SIZE ~= ";
       if (type_size) {
         stream << type_size;
       } else {
@@ -206,7 +231,7 @@ class LoggerImpl {
     }
 
     // reset to default colors again
-    stream << ANSI_DEFAULT;
+    stream << __ansi_default;
 
     if (fmt & LogFmt::NEWLINE) {
       stream << '\n';
@@ -449,10 +474,10 @@ class Logger {
 
  public:
   Logger() :
-    _stream(std::cerr) {
+    _stream(std::cerr), _name("LOG") {
     set_log_level(Level::STANDARD);
     set_log_format(Level::STANDARD);
-    _log_impl = new LogImpl();
+    set_log_impl(nullptr);
   }
 
   Logger(const char *name, LogImpl *log_impl = nullptr) :
@@ -504,6 +529,8 @@ class Logger {
     } else {
       _log_impl = new LogImpl();
     }
+
+    _log_impl->set_name(_name);
   }
 
   template<typename T>
