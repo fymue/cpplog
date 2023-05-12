@@ -71,6 +71,12 @@ static const char *__ansi_green   = "\033[32m";
 static const char *__ansi_yellow  = "\033[33m";
 static const char *__ansi_default = "\033[39m";
 
+// limit number of chars of logged string
+static constexpr int CPPLOG_MX_STR_LEN = 50;
+
+// limit number of elements of logged container
+static constexpr int CPPLOG_MX_ELS     = 10;
+
 // ### operator<< overloads for most std library types ###
 
 template<typename T>
@@ -267,11 +273,11 @@ class LoggerImpl {
     parse_fmt_opts(stream, p, fmt);
   }
 
-  // log C strings and std::string
-  void log(std::ostream &stream, const std::string &str, LogFormat fmt) {
-    size_t str_len = str.size();
+  // log C string
+  void log(std::ostream &stream, const char *str, LogFormat fmt) {
+    size_t str_len = std::strlen(str);
 
-    if (fmt & LogFmt::VERBOSE || str_len < 20) {
+    if (fmt & LogFmt::VERBOSE || str_len < CPPLOG_MX_STR_LEN) {
       parse_fmt_opts(stream, str, fmt, str_len);
     } else {
       // if a string is longer than 20 characters,
@@ -301,14 +307,18 @@ class LoggerImpl {
     }
   }
 
+  // log std::string
+  void log(std::ostream &stream, const std::string &str, LogFormat fmt) {
+    log(stream, str.c_str(), fmt);
+  }
+
   // log std::vector
   template<typename T>
   void log(std::ostream &stream, const std::vector<T> &vec, LogFormat fmt) {
     size_t size = vec.size();
-    size_t mx_size = 10;
     size_t size_in_bytes = size * sizeof(T);
 
-    if (fmt & LogFmt::VERBOSE || size < mx_size) {
+    if (fmt & LogFmt::VERBOSE || size < CPPLOG_MX_ELS) {
       parse_fmt_opts(stream, vec, fmt, size_in_bytes);
     } else {
       // if a vector contains more than mx_size elements,
@@ -317,12 +327,12 @@ class LoggerImpl {
       formatted_vec << "vector: [";
       formatted_vec << vec[0];
 
-      for (size_t i = 1; i < mx_size / 2; ++i) {
+      for (size_t i = 1; i < CPPLOG_MX_ELS / 2; ++i) {
         formatted_vec << ", " << vec[i];
       }
 
       formatted_vec << " ... ";
-      size_t start = size - (mx_size / 2);
+      size_t start = size - (CPPLOG_MX_ELS / 2);
       formatted_vec << vec[start++];
 
       for (size_t i = start; i < size; ++i) {
@@ -339,10 +349,9 @@ class LoggerImpl {
   void log(std::ostream &stream,
            const std::array<T, SIZE> &arr, LogFormat fmt) {
     size_t size = arr.size();
-    size_t mx_size = 10;
     size_t size_in_bytes = size * sizeof(T);
 
-    if (fmt & LogFmt::VERBOSE || size < mx_size) {
+    if (fmt & LogFmt::VERBOSE || size < CPPLOG_MX_ELS) {
       parse_fmt_opts(stream, arr, fmt, size_in_bytes);
     } else {
       // if an array contains more than mx_size elements,
@@ -351,12 +360,12 @@ class LoggerImpl {
       formatted_arr << "array: [";
       formatted_arr << arr[0];
 
-      for (size_t i = 1; i < mx_size / 2; ++i) {
+      for (size_t i = 1; i < CPPLOG_MX_ELS / 2; ++i) {
         formatted_arr << ", " << arr[i];
       }
 
       formatted_arr << " ... ";
-      size_t start = size - (mx_size / 2);
+      size_t start = size - (CPPLOG_MX_ELS / 2);
       formatted_arr << arr[start++];
 
       for (size_t i = start; i < size; ++i) {
@@ -372,10 +381,9 @@ class LoggerImpl {
   template<typename K, typename V>
   void log(std::ostream &stream, const std::map<K, V> &map, LogFormat fmt) {
     size_t size = map.size();
-    size_t mx_size = 8;
     size_t size_in_bytes = size * sizeof(K) + size * sizeof(V);  // estimate
 
-    if (fmt & LogFmt::VERBOSE || size < mx_size) {
+    if (fmt & LogFmt::VERBOSE || size < CPPLOG_MX_ELS) {
       parse_fmt_opts(stream, map, fmt, size_in_bytes);
     } else {
       // if a map contains more than mx_size key-value pairs,
@@ -387,12 +395,12 @@ class LoggerImpl {
       formatted_map << map_it->first << ": " << map_it->second;
       ++map_it;
 
-      for (; left_start < mx_size / 2; ++map_it, ++left_start) {
+      for (; left_start < CPPLOG_MX_ELS / 2; ++map_it, ++left_start) {
         formatted_map << ", " << map_it->first << ": " << map_it->second;
       }
 
       formatted_map << " ... ";
-      size_t skip_c = (size - (mx_size / 2)) - left_start;
+      size_t skip_c = (size - (CPPLOG_MX_ELS / 2)) - left_start;
       std::advance(map_it, skip_c);
       left_start += skip_c;
 
@@ -414,10 +422,9 @@ class LoggerImpl {
   void log(std::ostream &stream,
            const std::unordered_map<K, V> &map, LogFormat fmt) {
     size_t size = map.size();
-    size_t mx_size = 8;
     size_t size_in_bytes = size * sizeof(K) + size * sizeof(V);  // estimate
 
-    if (fmt & LogFmt::VERBOSE || size < mx_size) {
+    if (fmt & LogFmt::VERBOSE || size < CPPLOG_MX_ELS) {
       parse_fmt_opts(stream, map, fmt, size_in_bytes);
     } else {
       // if an unordered map contains more than mx_size key-value pairs,
@@ -429,12 +436,12 @@ class LoggerImpl {
       formatted_map << map_it->first << ": " << map_it->second;
       ++map_it;
 
-      for (; left_start < mx_size / 2; ++map_it, ++left_start) {
+      for (; left_start < CPPLOG_MX_ELS / 2; ++map_it, ++left_start) {
         formatted_map << ", " << map_it->first << ": " << map_it->second;
       }
 
       formatted_map << " ... ";
-      size_t skip_c = (size - (mx_size / 2)) - left_start;
+      size_t skip_c = (size - (CPPLOG_MX_ELS / 2)) - left_start;
       std::advance(map_it, skip_c);
       left_start += skip_c;
 
