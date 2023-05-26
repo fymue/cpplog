@@ -31,6 +31,7 @@
 #include <cstdint>
 #include <cstring>
 #include <ctime>
+#include <cassert>
 
 // ### types that can be logged by default: ###
 // all primitive types
@@ -493,6 +494,181 @@ class Logger {
   static const LogFormat _default_info_fmt =
     LogFmt::HIGHLIGHT_GREEN | LogFmt::TIMESTAMP | LogFmt::NEWLINE;
 
+  /*
+   * contains data of a to-be-formatted object from the format string;
+   * the format string can parse decimal numbers, floating point numbers,
+   * strings and objects. Formatting can be specified in curly brackets
+   * with Python/printf-like syntax:
+   *   {_>10.2f} -> left-padded w/ '_', 10 chars, 2 decimal place float
+   *   {08d< }   -> left-padded w/ '0, 8 chars, decimal, right-padded w/ ' '
+   */
+  struct FormatStringObject {
+    enum TYPE {
+     NONE, INT, FLOAT, STRING, OBJECT
+    };
+
+    TYPE type;
+    char left_pad_chr, right_pad_chr;
+    uint16_t mx_len, mx_decimal_places;
+
+    FormatStringObject() :
+      type(NONE), left_pad_chr(' '), right_pad_chr(' '),
+      mx_len(0), mx_decimal_places(0) {}
+
+    // fmt specifiers
+    static const char OPEN_FMT           = '{';
+    static const char CLOSE_FMT          = '}';
+    static const char OBJECT_FMT         = 'o';
+    static const char STRING_FMT         = 's';
+    static const char INT_FMT            = 'd';
+    static const char FLOAT_FMT          = 'f';
+    static const char DECIMAL_PLACES_FMT = '.';
+    static const char PAD_LEFT_FMT       = '>';
+    static const char PAD_RIGHT_FMT      = '<';
+
+    static void pad(std::ostream &stream, int n, char pad_chr) {
+      for (int i = 0; i < n; ++i) {
+        stream << pad_chr;
+      }
+    }
+
+    static bool is_number(char chr) {
+      switch (chr) {
+        case '0' : return true;
+        case '1' : return true;
+        case '2' : return true;
+        case '3' : return true;
+        case '4' : return true;
+        case '5' : return true;
+        case '6' : return true;
+        case '7' : return true;
+        case '8' : return true;
+        case '9' : return true;
+        default  : return false;
+      }
+    }
+
+    // parse a (multi-digit) number from format string
+    static uint16_t get_number(const char *fmt_str, int &fmt_str_idx) {
+      constexpr uint8_t MX_DIGITS = 3;
+      char number[] = "0\0\0";
+      int number_i = 0;
+
+      while (number_i < MX_DIGITS &&
+             FormatStringObject::is_number(fmt_str[fmt_str_idx])) {
+        number[number_i++] = fmt_str[fmt_str_idx++];
+      }
+
+      return static_cast<uint16_t>(std::stoi(number));
+    }
+
+    friend std::ostream &operator<<(std::ostream &stream,
+                                    const FormatStringObject &obj) {
+      stream << "Type: " << obj.type << ", Left pad: '" << obj.left_pad_chr
+             << "', Right pad: '" << obj.right_pad_chr << "', Mx Length: "
+             << obj.mx_len << ", Mx decimal places: " << obj.mx_decimal_places
+             << "\n";
+      return stream;
+    }
+  };
+
+  std::vector<FormatStringObject> _parse_format_string(const char *fmt_str) {
+    std::vector<FormatStringObject> fmt_objs;
+
+    size_t str_len = std::strlen(fmt_str);
+
+    for (int i = 0; i < str_len;) {
+      if (fmt_str[i] == FormatStringObject::OPEN_FMT) {
+        ++i;
+        FormatStringObject obj;
+
+        // store left pad character (if specified, comes before '>')
+        if (fmt_str[i + 1] == FormatStringObject::PAD_LEFT_FMT) {
+          obj.left_pad_chr = fmt_str[i];
+          i += 2;
+        }
+
+        // store max number of characters of formatted argument
+        obj.mx_len =
+          FormatStringObject::
+            get_number(fmt_str, i);
+
+        // store max number of decimal places after floating point number
+        if (fmt_str[i] == FormatStringObject::DECIMAL_PLACES_FMT) {
+          ++i;
+          obj.mx_decimal_places =
+            FormatStringObject::
+              get_number(fmt_str, i);
+        }
+
+        // store type specifier
+        switch (fmt_str[i]) {
+          case FormatStringObject::INT_FMT :
+            obj.type = FormatStringObject::INT;
+            break;
+          case FormatStringObject::FLOAT_FMT :
+            obj.type = FormatStringObject::FLOAT;
+            break;
+          case FormatStringObject::STRING_FMT :
+            obj.type = FormatStringObject::STRING;
+            break;
+          case FormatStringObject::OBJECT_FMT :
+            obj.type = FormatStringObject::OBJECT;
+            break;
+          default:
+            std::cerr << "Unkown format specifier '" << fmt_str[i] << "'\n";
+            std::exit(1);
+        }
+        ++i;
+        std::cerr << fmt_str[i] << "\n";
+        // store right-pad character (if it was specified, comes after '<')
+        if (fmt_str[i] == FormatStringObject::PAD_RIGHT_FMT) {
+          ++i;
+          obj.right_pad_chr = fmt_str[i++];
+        }
+
+        fmt_objs.push_back(obj);
+
+        assert(fmt_str[i] == FormatStringObject::CLOSE_FMT);
+      } else {
+        ++i;
+      }
+    }
+
+    return fmt_objs;
+  }
+
+  template<typename T>
+  void _log_fmt_arg(T &&arg, LogFormat fmt, const FormatStringObject &fmt_obj) {
+    std::stringstream str;
+
+    switch (fmt_obj.type) {
+      case FormatStringObject::INT :
+        break;
+      case FormatStringObject::FLOAT :
+        break;
+      case FormatStringObject::STRING :
+        break;
+      case FormatStringObject::OBJECT :
+        str << arg;
+        break;
+    }
+
+    _log_impl->parse_fmt_opts(_stream, str.rdbuf(), fmt);
+  }
+
+  // empty function to terminate variadic argument recursion
+  void _log_format_string_args(const std::vector<FormatStringObject> &fmt_objs,
+                               int obj_idx, LogFormat fmt) {}
+
+  template<typename T, typename ...Tr>
+  void _log_format_string_args(const std::vector<FormatStringObject> &fmt_objs,
+                               int obj_idx, LogFormat fmt,
+                               T &&first, Tr &&...rest) {
+    _log_fmt_arg(std::move(first), fmt, fmt_objs[obj_idx++]);
+    _log_format_string_args(fmt_objs, obj_idx, fmt, std::forward<Tr>(rest)...);
+  }
+
  public:
   Logger() :
     _stream(std::cerr), _name("LOG") {
@@ -564,6 +740,36 @@ class Logger {
     _log_impl->log(_stream, t, _log_format | _default_err_fmt);
   }
 
+  /*
+   * print args accoring to format specified by fmt_str;
+   * the format string can parse decimal numbers, floating point numbers,
+   * strings and objects. Formatting can be specified in curly brackets
+   * with Python/printf-like syntax:
+   *   {_>10.2f} -> left-padded w/ '_', 10 chars, 2 decimal place float
+   *   {08d< }   -> left-padded w/ '0, 8 chars, decimal, right-padded w/ ' '
+   */
+  template<typename ...T>
+  void error(const char *fmt_str, T&&... args) {
+    std::vector<FormatStringObject> objs = _parse_format_string(fmt_str);
+    _log_format_string_args(objs, 0, _log_format | _default_err_fmt,
+                            std::forward<T>(args)...);
+  }
+
+  /*
+   * print args accoring to format specified by fmt_str using custom LogFormat;
+   * the format string can parse decimal numbers, floating point numbers,
+   * strings and objects. Formatting can be specified in curly brackets
+   * with Python/printf-like syntax:
+   *   {_>10.2f} -> left-padded w/ '_', 10 chars, 2 decimal place float
+   *   {08d< }   -> left-padded w/ '0, 8 chars, decimal, right-padded w/ ' '
+   */
+  template<typename ...T>
+  void error(const char *fmt_str, LogFormat fmt, T&&... args) {
+    std::vector<FormatStringObject> objs = _parse_format_string(fmt_str);
+    _log_format_string_args(objs, 0, fmt | _default_err_fmt,
+                            std::forward<T>(args)...);
+  }
+
   template<typename T>
   void warn(const T &t, LogFormat fmt) {
     _log_impl->log(_stream, t, fmt | _default_warn_fmt);
@@ -574,6 +780,36 @@ class Logger {
     _log_impl->log(_stream, t, _log_format | _default_warn_fmt);
   }
 
+  /*
+   * print args accoring to format specified by fmt_str;
+   * the format string can parse decimal numbers, floating point numbers,
+   * strings and objects. Formatting can be specified in curly brackets
+   * with Python/printf-like syntax:
+   *   {_>10.2f} -> left-padded w/ '_', 10 chars, 2 decimal place float
+   *   {08d< }   -> left-padded w/ '0, 8 chars, decimal, right-padded w/ ' '
+   */
+  template<typename ...T>
+  void warn(const char *fmt_str, T&&... args) {
+    std::vector<FormatStringObject> objs = _parse_format_string(fmt_str);
+    _log_format_string_args(objs, 0, _log_format | _default_warn_fmt,
+                            std::forward<T>(args)...);
+  }
+
+  /*
+   * print args accoring to format specified by fmt_str using custom LogFormat;
+   * the format string can parse decimal numbers, floating point numbers,
+   * strings and objects. Formatting can be specified in curly brackets
+   * with Python/printf-like syntax:
+   *   {_>10.2f} -> left-padded w/ '_', 10 chars, 2 decimal place float
+   *   {08d< }   -> left-padded w/ '0, 8 chars, decimal, right-padded w/ ' '
+   */
+  template<typename ...T>
+  void warn(const char *fmt_str, LogFormat fmt, T&&... args) {
+    std::vector<FormatStringObject> objs = _parse_format_string(fmt_str);
+    _log_format_string_args(objs, 0, fmt | _default_err_fmt,
+                            std::forward<T>(args)...);
+  }
+
   template<typename T>
   void info(const T &t, LogFormat fmt) {
     _log_impl->log(_stream, t, fmt | _default_info_fmt);
@@ -582,6 +818,38 @@ class Logger {
   template<typename T>
   void info(const T &t) {
     _log_impl->log(_stream, t, _log_format | _default_info_fmt);
+  }
+
+  /*
+   * print args accoring to format specified by fmt_str;
+   * the format string can parse decimal numbers, floating point numbers,
+   * strings and objects. Formatting can be specified in curly brackets
+   * with Python/printf-like syntax:
+   *   {_>10.2f} -> left-padded w/ '_', 10 chars, 2 decimal place float
+   *   {08d< }   -> left-padded w/ '0, 8 chars, decimal, right-padded w/ ' '
+   */
+  template<typename ...T>
+  void info(const char *fmt_str, T&&... args) {
+    std::vector<FormatStringObject> objs = _parse_format_string(fmt_str);
+    for (const auto &el : objs) std::cerr << el << "\n";
+    std::exit(0);
+    _log_format_string_args(objs, 0, _log_format | _default_info_fmt,
+                            std::forward<T>(args)...);
+  }
+
+  /*
+   * print args accoring to format specified by fmt_str using custom LogFormat;
+   * the format string can parse decimal numbers, floating point numbers,
+   * strings and objects. Formatting can be specified in curly brackets
+   * with Python/printf-like syntax:
+   *   {_>10.2f} -> left-padded w/ '_', 10 chars, 2 decimal place float
+   *   {08d< }   -> left-padded w/ '0, 8 chars, decimal, right-padded w/ ' '
+   */
+  template<typename ...T>
+  void info(const char *fmt_str, LogFormat fmt, T&&... args) {
+    std::vector<FormatStringObject> objs = _parse_format_string(fmt_str);
+    _log_format_string_args(objs, 0, fmt | _default_err_fmt,
+                            std::forward<T>(args)...);
   }
 };
 
