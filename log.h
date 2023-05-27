@@ -500,7 +500,21 @@ class Logger {
    * strings and objects. Formatting can be specified in curly brackets
    * with Python/printf-like syntax:
    *   {_>10.2f} -> left-padded w/ '_', 10 chars, 2 decimal place float
-   *   {08d< }   -> left-padded w/ '0, 8 chars, decimal, right-padded w/ ' '
+   *   {0>8d< }   -> left-padded w/ '0, 8 chars, decimal, right-padded w/ ' '
+   * supported format specifiers (have to be inside {...}):
+   *   - '>' : any character put before '>' will be used to left-pad
+   *     the to-be-printed type (if a max character size was also specified);
+   *     '>' should be the 2nd character in the specified format
+   *   - max character size: limit the number of characters the to-be-printed
+   *     output can have; this number should be either the first number
+   *     of the format or put after the '>' specifier (for left-padding)
+   *   - '.' : specify the number of decimal places after a floating-point
+   *     number after this character
+   *   - 'd' | 'f' | 's' | 'o': specify that the to-be-printed parameter
+   *     is a decimal number, floating-point number, string or object
+   *   - '<' : any character put after '<' will be used to right-pad
+   *     the to-be-printed type (if a max character size was also specified);
+   *     '>' should be the 2nd to last character in the specified format
    */
   struct FormatStringObject {
     enum TYPE {
@@ -548,6 +562,14 @@ class Logger {
       }
     }
 
+    static std::string get_type(TYPE type) {
+      case TYPE::INT    : return std::string("Decimal number");
+      case TYPE::FLOAT  : return std::string("Floating-point number");
+      case TYPE::STRING : return std::string("String");
+      case TYPE::OBJECT : return std::string("Object");
+      case TYPE::NONE   : return std::string("None");
+    }
+
     // parse a (multi-digit) number from format string
     static uint16_t get_number(const char *fmt_str, int &fmt_str_idx) {
       constexpr uint8_t MX_DIGITS = 3;
@@ -564,7 +586,8 @@ class Logger {
 
     friend std::ostream &operator<<(std::ostream &stream,
                                     const FormatStringObject &obj) {
-      stream << "Type: " << obj.type << ", Left pad: '" << obj.left_pad_chr
+      stream << "Type: " << FormatStringObject::get_type(obj.type)
+             << ", Left pad: '" << obj.left_pad_chr
              << "', Right pad: '" << obj.right_pad_chr << "', Mx Length: "
              << obj.mx_len << ", Mx decimal places: " << obj.mx_decimal_places
              << "\n";
@@ -652,6 +675,8 @@ class Logger {
       case FormatStringObject::OBJECT :
         str << arg;
         break;
+      default:
+       str << "Unkown type";
     }
 
     _log_impl->parse_fmt_opts(_stream, str.rdbuf(), fmt);
@@ -746,7 +771,7 @@ class Logger {
    * strings and objects. Formatting can be specified in curly brackets
    * with Python/printf-like syntax:
    *   {_>10.2f} -> left-padded w/ '_', 10 chars, 2 decimal place float
-   *   {08d< }   -> left-padded w/ '0, 8 chars, decimal, right-padded w/ ' '
+   *   {0>8d< }   -> left-padded w/ '0, 8 chars, decimal, right-padded w/ ' '
    */
   template<typename ...T>
   void error(const char *fmt_str, T&&... args) {
@@ -761,7 +786,7 @@ class Logger {
    * strings and objects. Formatting can be specified in curly brackets
    * with Python/printf-like syntax:
    *   {_>10.2f} -> left-padded w/ '_', 10 chars, 2 decimal place float
-   *   {08d< }   -> left-padded w/ '0, 8 chars, decimal, right-padded w/ ' '
+   *   {0>8d< }   -> left-padded w/ '0, 8 chars, decimal, right-padded w/ ' '
    */
   template<typename ...T>
   void error(const char *fmt_str, LogFormat fmt, T&&... args) {
@@ -786,7 +811,7 @@ class Logger {
    * strings and objects. Formatting can be specified in curly brackets
    * with Python/printf-like syntax:
    *   {_>10.2f} -> left-padded w/ '_', 10 chars, 2 decimal place float
-   *   {08d< }   -> left-padded w/ '0, 8 chars, decimal, right-padded w/ ' '
+   *   {0>8d< }   -> left-padded w/ '0, 8 chars, decimal, right-padded w/ ' '
    */
   template<typename ...T>
   void warn(const char *fmt_str, T&&... args) {
@@ -801,7 +826,7 @@ class Logger {
    * strings and objects. Formatting can be specified in curly brackets
    * with Python/printf-like syntax:
    *   {_>10.2f} -> left-padded w/ '_', 10 chars, 2 decimal place float
-   *   {08d< }   -> left-padded w/ '0, 8 chars, decimal, right-padded w/ ' '
+   *   {0>8d< }   -> left-padded w/ '0, 8 chars, decimal, right-padded w/ ' '
    */
   template<typename ...T>
   void warn(const char *fmt_str, LogFormat fmt, T&&... args) {
@@ -826,7 +851,7 @@ class Logger {
    * strings and objects. Formatting can be specified in curly brackets
    * with Python/printf-like syntax:
    *   {_>10.2f} -> left-padded w/ '_', 10 chars, 2 decimal place float
-   *   {08d< }   -> left-padded w/ '0, 8 chars, decimal, right-padded w/ ' '
+   *   {0>8d< }   -> left-padded w/ '0, 8 chars, decimal, right-padded w/ ' '
    */
   template<typename ...T>
   void info(const char *fmt_str, T&&... args) {
@@ -843,7 +868,7 @@ class Logger {
    * strings and objects. Formatting can be specified in curly brackets
    * with Python/printf-like syntax:
    *   {_>10.2f} -> left-padded w/ '_', 10 chars, 2 decimal place float
-   *   {08d< }   -> left-padded w/ '0, 8 chars, decimal, right-padded w/ ' '
+   *   {0>8d< }   -> left-padded w/ '0, 8 chars, decimal, right-padded w/ ' '
    */
   template<typename ...T>
   void info(const char *fmt_str, LogFormat fmt, T&&... args) {
