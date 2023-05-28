@@ -54,14 +54,14 @@ enum LogFmt {
   HIGHLIGHT_YELLOW = 1 << 4,  // highlight the log msg yellow
   HIGHLIGHT_DEF    = 1 << 5,  // use default terminal color for log msg
   VERBOSE          = 1 << 6,  // print entire content (for container-like)
-  TYPE_SIZE        = 1 << 7,  // print (estimated) size of type
+  FORMAT_SIZE        = 1 << 7,  // print (estimated) size of type
   NAME             = 1 << 8,  // print name of Logger
 };
 
 // available log levels (also compliant with a valid log format)
 enum Level {
   STANDARD = NEWLINE | TIMESTAMP,
-  DEBUG    = NEWLINE | TIMESTAMP | TYPE_SIZE | NAME
+  DEBUG    = NEWLINE | TIMESTAMP | FORMAT_SIZE | NAME
 };
 
 typedef uint64_t LogFormat;
@@ -235,7 +235,7 @@ class LoggerImpl {
     stream << t;
 
     // print estimtated size of type (in bytes)
-    if (fmt & LogFmt::TYPE_SIZE) {
+    if (fmt & LogFmt::FORMAT_SIZE) {
       stream << " (SIZE ~= ";
       if (type_size) {
         stream << type_size;
@@ -518,11 +518,21 @@ class Logger {
    *     '>' should be the 2nd to last character in the specified format
    */
   struct FormatStringObject {
-    enum TYPE {
-     NONE, INT, FLOAT, STRING, CHAR, OBJECT
+    enum FORMAT {
+     NONE           = '\0',
+     INT            = 'd',
+     FLOAT          = 'f',
+     STRING         = 's',
+     CHAR           = 'c',
+     OBJECT         = 'o',
+     OPEN           = '{',
+     CLOSE          = '}',
+     DECIMAL_PLACES = '.',
+     PAD_LEFT       = '>',
+     PAD_RIGHT      = '<'
     };
 
-    TYPE type;
+    FORMAT type;
     char left_pad_chr, right_pad_chr;
     uint16_t mx_len, mx_decimal_places;
 
@@ -533,18 +543,6 @@ class Logger {
       type(NONE), left_pad_chr('\0'), right_pad_chr('\0'),
       mx_len(0), mx_decimal_places(0), start_idx(0), end_idx(0) {}
 
-    // fmt specifiers
-    static const char OPEN_FMT           = '{';
-    static const char CLOSE_FMT          = '}';
-    static const char OBJECT_FMT         = 'o';
-    static const char STRING_FMT         = 's';
-    static const char INT_FMT            = 'd';
-    static const char FLOAT_FMT          = 'f';
-    static const char CHAR_FMT           = 'c';
-    static const char DECIMAL_PLACES_FMT = '.';
-    static const char PAD_LEFT_FMT       = '>';
-    static const char PAD_RIGHT_FMT      = '<';
-
     static void pad(std::ostream &stream, int n, char pad_chr) {
       if (n < 0) return;
 
@@ -554,29 +552,21 @@ class Logger {
     }
 
     static bool is_number(char chr) {
-      switch (chr) {
-        case '0' : return true;
-        case '1' : return true;
-        case '2' : return true;
-        case '3' : return true;
-        case '4' : return true;
-        case '5' : return true;
-        case '6' : return true;
-        case '7' : return true;
-        case '8' : return true;
-        case '9' : return true;
-        default  : return false;
+      if (chr < '0' || chr > '9') {
+        return false;
       }
+
+      return true;
     }
 
-    static std::string get_type(TYPE type) {
+    static std::string get_type(FORMAT type) {
       switch (type) {
-        case TYPE::INT    : return std::string("Decimal number");
-        case TYPE::FLOAT  : return std::string("Floating-point number");
-        case TYPE::STRING : return std::string("String");
-        case TYPE::OBJECT : return std::string("Object");
-        case TYPE::CHAR   : return std::string("Character");
-        case TYPE::NONE   : return std::string("None");
+        case FORMAT::INT    : return std::string("Decimal number");
+        case FORMAT::FLOAT  : return std::string("Floating-point number");
+        case FORMAT::STRING : return std::string("String");
+        case FORMAT::OBJECT : return std::string("Object");
+        case FORMAT::CHAR   : return std::string("Character");
+        case FORMAT::NONE   : return std::string("None");
       }
     }
 
@@ -611,13 +601,13 @@ class Logger {
     size_t str_len = std::strlen(fmt_str);
 
     for (int i = 0; i < str_len;) {
-      if (fmt_str[i] == FormatStringObject::OPEN_FMT) {
+      if (fmt_str[i] == FormatStringObject::OPEN) {
         FormatStringObject obj;
         obj.start_idx = i;
         ++i;
 
         // store left pad character (if specified, comes before '>')
-        if (fmt_str[i + 1] == FormatStringObject::PAD_LEFT_FMT) {
+        if (fmt_str[i + 1] == FormatStringObject::PAD_LEFT) {
           obj.left_pad_chr = fmt_str[i];
           i += 2;
         }
@@ -626,26 +616,26 @@ class Logger {
         obj.mx_len = FormatStringObject::get_number(fmt_str, i);
 
         // store max number of decimal places after floating point number
-        if (fmt_str[i] == FormatStringObject::DECIMAL_PLACES_FMT) {
+        if (fmt_str[i] == FormatStringObject::DECIMAL_PLACES) {
           ++i;
           obj.mx_decimal_places = FormatStringObject::get_number(fmt_str, i);
         }
 
         // store type specifier
         switch (fmt_str[i]) {
-          case FormatStringObject::INT_FMT :
+          case FormatStringObject::INT :
             obj.type = FormatStringObject::INT;
             break;
-          case FormatStringObject::FLOAT_FMT :
+          case FormatStringObject::FLOAT :
             obj.type = FormatStringObject::FLOAT;
             break;
-          case FormatStringObject::STRING_FMT :
+          case FormatStringObject::STRING :
             obj.type = FormatStringObject::STRING;
             break;
-          case FormatStringObject::OBJECT_FMT :
+          case FormatStringObject::OBJECT :
             obj.type = FormatStringObject::OBJECT;
             break;
-          case FormatStringObject::CHAR_FMT:
+          case FormatStringObject::CHAR:
             obj.type = FormatStringObject::CHAR;
             break;
           default:
@@ -656,18 +646,18 @@ class Logger {
         ++i;
 
         // store right-pad character (if it was specified, comes after '<')
-        if (fmt_str[i] == FormatStringObject::PAD_RIGHT_FMT) {
+        if (fmt_str[i] == FormatStringObject::PAD_RIGHT) {
           ++i;
           obj.right_pad_chr = fmt_str[i++];
         }
 
-        assert(fmt_str[i] == FormatStringObject::CLOSE_FMT);
+        assert(fmt_str[i] == FormatStringObject::CLOSE);
 
         obj.end_idx = i + 1;
         fmt_objs.push_back(obj);
 
-        if (fmt_str[i] != FormatStringObject::CLOSE_FMT) {
-          std::cerr << "Error: Expected '" << FormatStringObject::CLOSE_FMT
+        if (fmt_str[i] != FormatStringObject::CLOSE) {
+          std::cerr << "Error: Expected '" << FormatStringObject::CLOSE
                     << "', found '" << fmt_str[i] << "'!\n";
           std::exit(1);
         }
@@ -865,8 +855,7 @@ class Logger {
 
   template<typename T>
   void error(const T &t) {
-    std::lock_guard<std::mutex> lock(_mutex);
-    _log_impl->log(_stream, t, _log_format | _default_err_fmt);
+    error(t, _log_format);
   }
 
   /*
@@ -879,14 +868,7 @@ class Logger {
    */
   template<typename ...T>
   void error(const char *fmt_str, T&&... args) {
-    std::vector<FormatStringObject> objs = _parse_format_string(fmt_str);
-    std::stringstream fmt_stream;
-    _log_format_string_args(fmt_stream, objs, fmt_str, 0,
-                            objs.front().start_idx, 0,
-                            std::forward<T>(args)...);
-    std::lock_guard<std::mutex> lock(_mutex);
-    _log_impl->parse_fmt_opts(_stream, fmt_stream.rdbuf(),
-                              _log_format | _default_err_fmt);
+    error(fmt_str, _log_format, std::forward<T>(args)...);
   }
 
   template<typename ...T>
@@ -903,8 +885,7 @@ class Logger {
 
   template<typename T>
   void warn(const T &t, LogFormat fmt) {
-    std::lock_guard<std::mutex> lock(_mutex);
-    _log_impl->log(_stream, t, fmt | _default_warn_fmt);
+    warn(t, _log_format);
   }
 
   template<typename T>
@@ -923,14 +904,7 @@ class Logger {
    */
   template<typename ...T>
   void warn(const char *fmt_str, T&&... args) {
-    std::vector<FormatStringObject> objs = _parse_format_string(fmt_str);
-    std::stringstream fmt_stream;
-    _log_format_string_args(fmt_stream, objs, fmt_str, 0,
-                            objs.front().start_idx, 0,
-                            std::forward<T>(args)...);
-    std::lock_guard<std::mutex> lock(_mutex);
-    _log_impl->parse_fmt_opts(_stream, fmt_stream.rdbuf(),
-                              _log_format | _default_warn_fmt);
+    warn(fmt_str, _log_format, std::forward<T>(args)...);
   }
 
   template<typename ...T>
@@ -953,8 +927,7 @@ class Logger {
 
   template<typename T>
   void info(const T &t) {
-    std::lock_guard<std::mutex> lock(_mutex);
-    _log_impl->log(_stream, t, _log_format | _default_info_fmt);
+    info(t, _log_format);
   }
 
   /*
@@ -967,14 +940,7 @@ class Logger {
    */
   template<typename ...T>
   void info(const char *fmt_str, T&&... args) {
-    std::vector<FormatStringObject> objs = _parse_format_string(fmt_str);
-    std::stringstream fmt_stream;
-    _log_format_string_args(fmt_stream, objs, fmt_str, 0,
-                            objs.front().start_idx, 0,
-                            std::forward<T>(args)...);
-    std::lock_guard<std::mutex> lock(_mutex);
-    _log_impl->parse_fmt_opts(_stream, fmt_stream.rdbuf(),
-                              _log_format | _default_info_fmt);
+    info(fmt_str, _log_format, std::forward<T>(args)...);
   }
 
   template<typename ...T>
