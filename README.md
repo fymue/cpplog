@@ -27,6 +27,8 @@ The supported format specifiers are:
 - 'd' | 'f' | 's' | 'o' | 'c' : specify that the to-be-printed parameter is a decimal number, floating-point number, string, object or character
 - '<' : any character put after '<' will be used to right-pad the to-be-printed type (if a max character size was also specified); '>' should be the 2nd to last character in the specified format
 
+Check out the example below to see how this would look inside an actual program.
+
 If you wish to be able to log your own custom types, you can simply extend the `LoggerImpl` and provide custom overloads for the `log` method for your custom types (see following example):
 
 ```
@@ -62,8 +64,16 @@ class MyLogImpl: public cpplog::LoggerImpl {
 int main() {
   Vec3 vec = Vec3{1, 2, 3};
   cpplog::Logger<MyLogImpl> *logger = cpplog::create_log("my_log", new MyLogImpl());
-  cpplog::LogFormat fmt = cpplog::LogFmt::TIMESTAMP | cpplog::HIGHLIGHT_GREEN | cpplog::TYPE_SIZE;
+  cpplog::LogFormat fmt = cpplog::LogFmt::TIMESTAMP | cpplog::LogFmt::HIGHLIGHT_GREEN | cpplog::LogFmt::TYPE_SIZE;
+
   logger->info(vec, fmt);  // prints e.g. "[12:30:00] vec3: [1, 2, 3] (SIZE ~= 12 bytes)"
+
+  logger->warn("This is a {#>20s<#}!", "test warning");  // prints "This is a ####test warning####!"
+
+  int p = 10;
+  float x = 12.223, y = 145.451, z = 6.1337;
+  logger->error("The coordinates of point {0>4d} are: '{ >6.2f}', '{ >6.2f}', '{ >6.2f}'", p, x, y, z);
+  // prints "The coordinates of point 0010 are: ' 12.22', '145.45', '  6.13'"
   delete logger;
 }
 ```

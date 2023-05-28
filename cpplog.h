@@ -54,14 +54,14 @@ enum LogFmt {
   HIGHLIGHT_YELLOW = 1 << 4,  // highlight the log msg yellow
   HIGHLIGHT_DEF    = 1 << 5,  // use default terminal color for log msg
   VERBOSE          = 1 << 6,  // print entire content (for container-like)
-  FORMAT_SIZE        = 1 << 7,  // print (estimated) size of type
+  TYPE_SIZE        = 1 << 7,  // print (estimated) size of type
   NAME             = 1 << 8,  // print name of Logger
 };
 
 // available log levels (also compliant with a valid log format)
 enum Level {
   STANDARD = NEWLINE | TIMESTAMP,
-  DEBUG    = NEWLINE | TIMESTAMP | FORMAT_SIZE | NAME
+  DEBUG    = NEWLINE | TIMESTAMP | TYPE_SIZE | NAME
 };
 
 typedef uint64_t LogFormat;
@@ -235,7 +235,7 @@ class LoggerImpl {
     stream << t;
 
     // print estimtated size of type (in bytes)
-    if (fmt & LogFmt::FORMAT_SIZE) {
+    if (fmt & LogFmt::TYPE_SIZE) {
       stream << " (SIZE ~= ";
       if (type_size) {
         stream << type_size;
