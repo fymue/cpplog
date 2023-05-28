@@ -871,13 +871,13 @@ class Logger {
     error(fmt_str, _log_format, std::forward<T>(args)...);
   }
 
-  template<typename ...T>
-  void error(const char *fmt_str, LogFormat fmt, T&&... args) {
+  template<typename T, typename ...Tr>
+  void error(const char *fmt_str, LogFormat fmt, T &&first, Tr&&... args) {
     std::vector<FormatStringObject> objs = _parse_format_string(fmt_str);
     std::stringstream fmt_stream;
     _log_format_string_args(fmt_stream, objs, fmt_str, 0,
-                            objs.front().start_idx, 0,
-                            std::forward<T>(args)...);
+                            objs.front().start_idx, 0, std::move(first),
+                            std::forward<Tr>(args)...);
     std::lock_guard<std::mutex> lock(_mutex);
     _log_impl->parse_fmt_opts(_stream, fmt_stream.rdbuf(),
                               fmt | _default_err_fmt);
@@ -907,13 +907,13 @@ class Logger {
     warn(fmt_str, _log_format, std::forward<T>(args)...);
   }
 
-  template<typename ...T>
-  void warn(const char *fmt_str, LogFormat fmt, T&&... args) {
+  template<typename T, typename ...Tr>
+  void warn(const char *fmt_str, LogFormat fmt, T &&first, Tr&&... args) {
     std::vector<FormatStringObject> objs = _parse_format_string(fmt_str);
     std::stringstream fmt_stream;
     _log_format_string_args(fmt_stream, objs, fmt_str, 0,
-                            objs.front().start_idx, 0,
-                            std::forward<T>(args)...);
+                            objs.front().start_idx, 0, std::move(first),
+                            std::forward<Tr>(args)...);
     std::lock_guard<std::mutex> lock(_mutex);
     _log_impl->parse_fmt_opts(_stream, fmt_stream.rdbuf(),
                               fmt | _default_warn_fmt);
@@ -943,13 +943,13 @@ class Logger {
     info(fmt_str, _log_format, std::forward<T>(args)...);
   }
 
-  template<typename ...T>
-  void info(const char *fmt_str, LogFormat fmt, T&&... args) {
+  template<typename T, typename ...Tr>
+  void info(const char *fmt_str, LogFormat fmt, T &&first, Tr&&... args) {
     std::vector<FormatStringObject> objs = _parse_format_string(fmt_str);
     std::stringstream fmt_stream;
     _log_format_string_args(fmt_stream, objs, fmt_str, 0,
-                            objs.front().start_idx, 0,
-                            std::forward<T>(args)...);
+                            objs.front().start_idx, 0, std::move(first),
+                            std::forward<Tr>(args)...);
     std::lock_guard<std::mutex> lock(_mutex);
     _log_impl->parse_fmt_opts(_stream, fmt_stream.rdbuf(),
                               fmt | _default_info_fmt);
