@@ -268,6 +268,12 @@ class LoggerImpl {
     parse_fmt_opts(stream, c, fmt);
   }
 
+  // log booleans
+  void log(std::ostream &stream, bool b, LogFormat fmt) {
+    const char *bool_val = b ? "true" : "false";
+    parse_fmt_opts(stream, bool_val, fmt, 1);
+  }
+
   // log std::pair
   template<typename T, typename U>
   void log(std::ostream &stream, const std::pair<T, U> &p, LogFormat fmt) {
@@ -524,6 +530,7 @@ class Logger {
      FLOAT          = 'f',
      STRING         = 's',
      CHAR           = 'c',
+     BOOL           = 'b',
      OBJECT         = 'o',
      OPEN           = '{',
      CLOSE          = '}',
@@ -566,6 +573,7 @@ class Logger {
         case FORMAT::STRING : return std::string("String");
         case FORMAT::OBJECT : return std::string("Object");
         case FORMAT::CHAR   : return std::string("Character");
+        case FORMAT::BOOL   : return std::string("Boolean");
         case FORMAT::NONE   : return std::string("None");
       }
     }
@@ -637,6 +645,9 @@ class Logger {
             break;
           case FormatStringObject::CHAR:
             obj.type = FormatStringObject::CHAR;
+            break;
+          case FormatStringObject::BOOL:
+            obj.type = FormatStringObject::BOOL;
             break;
           default:
             std::cerr << "Error: Unknown format specifier '"
@@ -750,6 +761,12 @@ class Logger {
       case FormatStringObject::CHAR :
         _pad_fmt_arg(fmt_arg, arg, fmt_obj);
         break;
+      case FormatStringObject::BOOL :
+      {
+        std::string bool_val = (arg == "1") ? "true" : "false";
+        _pad_fmt_arg(fmt_arg, bool_val, fmt_obj);
+        break;
+      }
       default:
        fmt_arg << "Unknown type";
     }

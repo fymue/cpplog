@@ -11,6 +11,7 @@ The logging is handled by the central `Logger` class. This class exposes the thr
 
 Internally, the `Logger` class uses a `LogImpl` class to handle all of the actual logging. The `LogImpl` class contains a `log` method that is overloaded for most standard library types and is used to appropriately log thoses types. The following types can be logged by default (assuming that all template parameters have an `operator<<` overload):
 - all primitive number types
+- booleans
 - `std::string` or C strings
 - `std::pair`
 - `std::array` and `std::vector`
@@ -24,7 +25,7 @@ The supported format specifiers are:
 - '>' : any character put before '>' will be used to left-pad the to-be-printed type (if a max character size was also specified); '>' should be the 2nd character in the specified format
 - max character size: limit the number of characters the to-be-printed output can have; this number should be either the first number of the format or put after the '>' specifier (for left-padding)
 - '.' : specify the number of decimal places after a floating-point number after this character
-- 'd' | 'f' | 's' | 'o' | 'c' : specify that the to-be-printed parameter is a decimal number, floating-point number, string, object or character
+- 'd' | 'f' | 's' | 'o' | 'c' | 'b' : specify that the to-be-printed parameter is a decimal number, floating-point number, string, object, character or boolean
 - '<' : any character put after '<' will be used to right-pad the to-be-printed type (if a max character size was also specified); '>' should be the 2nd to last character in the specified format
 
 Check out the example below to see how this would look inside an actual program.
