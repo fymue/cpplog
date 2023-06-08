@@ -171,7 +171,7 @@ static std::ostream &operator<<(std::ostream &stream,
  * specifies how a certain datatype should be logged;
  * defines a "void log(std::ostream &stream, CustomType t, LogFormat fmt)"
  * method for every loggable type;
- * this class should be extend if you wish to add log definitions
+ * this class should be extened if you wish to add log definitions
  * for you own custom types as the main "Logger" class will always
  * call a "log" method of whatever LogImpl object it owns
  */
@@ -494,18 +494,18 @@ class Logger {
   std::mutex _mutex;
 
   // default log formats for error, warning and info messages
-  static const LogFormat _default_err_fmt =
+  const LogFormat _default_err_fmt =
     LogFmt::HIGHLIGHT_RED | LogFmt::TIMESTAMP | LogFmt::NEWLINE;
-  static const LogFormat _default_warn_fmt =
+  const LogFormat _default_warn_fmt =
     LogFmt::HIGHLIGHT_YELLOW | LogFmt::TIMESTAMP | LogFmt::NEWLINE;
-  static const LogFormat _default_info_fmt =
+  const LogFormat _default_info_fmt =
     LogFmt::HIGHLIGHT_GREEN | LogFmt::TIMESTAMP | LogFmt::NEWLINE;
 
   /*
    * contains data of a to-be-formatted object from the format string;
    * the format string can parse decimal numbers, floating point numbers,
-   * strings, objects and characters. Formatting can be specified in curly brackets
-   * with Python/printf-like syntax:
+   * strings, objects and characters. Formatting can be specified in curly
+   * brackets with Python/printf-like syntax:
    *   {_>10.2f} -> left-padded w/ '_', 10 chars, 2 decimal place float
    *   {0>8d< }   -> left-padded w/ '0, 8 chars, decimal, right-padded w/ ' '
    * supported format specifiers (have to be inside {...}):
@@ -517,8 +517,9 @@ class Logger {
    *     of the format or put after the '>' specifier (for left-padding)
    *   - '.' : specify the number of decimal places after a floating-point
    *     number after this character
-   *   - 'd' | 'f' | 's' | 'o': specify that the to-be-printed parameter
-   *     is a decimal number, floating-point number, string or object
+   *   - 'd' | 'f' | 's' | 'o' | 'c' | 'b' : specify that the to-be-printed
+   *     parameter is a decimal number, floating-point number, string, object,
+   *     character or boolean
    *   - '<' : any character put after '<' will be used to right-pad
    *     the to-be-printed type (if a max character size was also specified);
    *     '>' should be the 2nd to last character in the specified format
@@ -559,11 +560,7 @@ class Logger {
     }
 
     static bool is_number(char chr) {
-      if (chr < '0' || chr > '9') {
-        return false;
-      }
-
-      return true;
+      return !(chr < '0' || chr > '9');
     }
 
     static std::string get_type(FORMAT type) {
