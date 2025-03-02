@@ -13,7 +13,7 @@ enum LogFormatOption {
   HIGHLIGHT_GREEN  = 1 << 3,  // highlight the log msg green
   HIGHLIGHT_YELLOW = 1 << 4,  // highlight the log msg yellow
   HIGHLIGHT_DEF    = 1 << 5,  // use default terminal color for log msg
-  VERBOSE          = 1 << 6,  // print entire content (for container-like)
+  NO_SIZE_LIMIT    = 1 << 6,  // print entire content (for container-like)
   TYPE_SIZE        = 1 << 7,  // print (estimated) size of type
   NAME             = 1 << 8,  // print name of Logger
 };
@@ -36,10 +36,16 @@ enum FormatStringSpecifier {
 };
 
 // available log levels (also compliant with a valid log format)
-enum LogLevel {
+enum LogVerboseLevel {
   STANDARD = LogFormatOption::NEWLINE | LogFormatOption::TIMESTAMP,
-  DEBUG    = LogFormatOption::NEWLINE   | LogFormatOption::TIMESTAMP |
+  VERBOSE  = LogFormatOption::NEWLINE   | LogFormatOption::TIMESTAMP |
              LogFormatOption::TYPE_SIZE | LogFormatOption::NAME
+};
+
+enum LogOutputLevel {
+  QUIET,    // no output at all
+  DEFAULT,  // only logging functions info, warn, error work
+  DEBUG     // logging function info, warn, error and debug work
 };
 
 typedef uint64_t LogFormat;

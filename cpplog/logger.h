@@ -116,19 +116,22 @@ class Logger {
 
     Logger(const char *name, const LogImpl &log_impl);
 
-    Logger(const char *name, LogLevel lvl, LogFormat fmt,
-           const LogImpl &log_impl, std::ostream &stream);
+    Logger(const char *name, LogVerboseLevel lvl, LogFormat fmt,
+           LogOutputLevel outputLvl, const LogImpl &log_impl, std::ostream &stream);
 
     ~Logger() {}
 
     // set log level
-    void set_log_level(LogLevel lvl);
+    void set_log_level(LogVerboseLevel lvl);
 
     // specify log format (see LogFormatOption enum for available options)
     void set_log_format(LogFormat fmt);
 
     // set stream all log messages shall be written to
     void set_stream(std::ostream &stream);
+
+    // determine which/if logging functions should output anything
+    void set_log_output_level(LogOutputLevel output_lvl);
 
     /*
     * set the log implementation object;
@@ -196,6 +199,26 @@ class Logger {
     template<typename T, typename ...Tr>
     void info(const char *fmt_str, LogFormat fmt, T &&first, Tr&&... args);
 
+    template<typename T>
+    void debug(const T &t, LogFormat fmt);
+
+    template<typename T>
+    void debug(const T &t);
+
+    /*
+    * print args accoring to format specified by fmt_str;
+    * the format string can parse decimal numbers, floating point numbers,
+    * strings, objects and characters. Formatting can be specified in curly
+    * brackets with Python/printf-like syntax:
+    *   {_>10.2f} -> left-padded w/ '_', 10 chars, 2 decimal place float
+    *   {0>8d< }   -> left-padded w/ '0, 8 chars, decimal, right-padded w/ ' '
+    */
+    template<typename ...T>
+    void debug(const char *fmt_str, T&&... args);
+
+    template<typename T, typename ...Tr>
+    void debug(const char *fmt_str, LogFormat fmt, T &&first, Tr&&... args);
+
   private:
 
     std::vector<FormatStringObject> _parse_format_string(const char *fmt_str);
@@ -222,11 +245,12 @@ class Logger {
                                 const char *fmt_str, int start_idx, int end_idx,
                                 int obj_idx, T &&first, Tr &&...rest);
 
-    LogLevel _log_lvl;
+    LogVerboseLevel _log_lvl;
     std::ostream *_stream;
     std::string _name;
     LogFormat _log_format;
     LogImpl _log_impl;
+    LogOutputLevel _log_output_lvl;
     std::mutex _mutex;
 
     // default log formats for error, warning and info messages
@@ -243,6 +267,12 @@ class Logger {
     const LogFormat _default_info_fmt =
       LogFormatOption::HIGHLIGHT_GREEN |
       LogFormatOption::TIMESTAMP       |
+      LogFormatOption::NEWLINE;
+
+    const LogFormat _default_debug_fmt =
+      LogFormatOption::HIGHLIGHT_DEF   |
+      LogFormatOption::TIMESTAMP       |
+      LogFormatOption::NO_SIZE_LIMIT   |
       LogFormatOption::NEWLINE;
 };
 
@@ -279,37 +309,35 @@ inline uint16_t FormatStringObject::get_number(const char *fmt_str,
 
 template<class LogImpl>
 inline Logger<LogImpl>::Logger() :
-  _stream(&std::cerr), _name("LOG") {
-  set_log_level(LogLevel::STANDARD);
-  set_log_format(LogLevel::STANDARD);
+  _stream(&std::cerr), _name("LOG"), _log_lvl(LogVerboseLevel::STANDARD),
+  _log_format(LogVerboseLevel::STANDARD) {
 }
 
 template<class LogImpl>
 inline Logger<LogImpl>::Logger(std::ostream &stream) :
-  _name("LOG"), _stream(&stream) {
-  set_log_level(LogLevel::STANDARD);
-  set_log_format(LogLevel::STANDARD);
+  _name("LOG"), _stream(&stream), _log_lvl(LogVerboseLevel::STANDARD),
+  _log_format(LogVerboseLevel::STANDARD) {
 }
 
 template<class LogImpl>
 inline Logger<LogImpl>::Logger(const char *name, const LogImpl &log_impl) :
-  _stream(&std::cerr), _name(name) {
-  set_log_level(LogLevel::STANDARD);
-  set_log_format(LogLevel::STANDARD);
+  _stream(&std::cerr), _name(name), _log_lvl(LogVerboseLevel::STANDARD),
+  _log_format(LogVerboseLevel::STANDARD) {
   set_log_impl(log_impl);
 }
 
 template<class LogImpl>
-inline Logger<LogImpl>::Logger(const char *name, LogLevel lvl, LogFormat fmt,
+inline Logger<LogImpl>::Logger(const char *name, LogVerboseLevel lvl,
+                               LogFormat fmt, LogOutputLevel output_lvl,
                                const LogImpl &log_impl, std::ostream &stream) :
-  _log_lvl(lvl), _stream(&stream), _name(name), _log_format(fmt) {
-  set_log_level(lvl);
-  set_log_format(fmt);
+  _name(name), _log_lvl(LogVerboseLevel::STANDARD),
+  _log_format(LogVerboseLevel::STANDARD), _log_output_lvl(output_lvl),
+  _stream(&stream) {
   set_log_impl(log_impl);
 }
 
 template<class LogImpl>
-inline void Logger<LogImpl>::set_log_level(LogLevel lvl) {
+inline void Logger<LogImpl>::set_log_level(LogVerboseLevel lvl) {
   _log_lvl = lvl;
   _log_format = _log_lvl;
 }
@@ -331,8 +359,15 @@ inline void Logger<LogImpl>::set_log_impl(const LogImpl &log_impl) {
 }
 
 template<class LogImpl>
+inline void Logger<LogImpl>::set_log_output_level(LogOutputLevel output_lvl) {
+  _log_output_lvl = output_lvl;
+}
+
+template<class LogImpl>
 template<typename T>
 inline void Logger<LogImpl>::error(const T &t, LogFormat fmt) {
+  if (_log_output_lvl == LogOutputLevel::QUIET) return;
+
   std::lock_guard<std::mutex> lock(_mutex);
   _log_impl.log(*_stream, t, fmt | _default_err_fmt);
 }
@@ -353,6 +388,8 @@ template<class LogImpl>
 template<typename T, typename ...Tr>
 inline void Logger<LogImpl>::error(const char *fmt_str, LogFormat fmt,
                                    T &&first, Tr&&... args) {
+  if (_log_output_lvl == LogOutputLevel::QUIET) return;
+
   std::vector<FormatStringObject> objs = _parse_format_string(fmt_str);
   std::stringstream fmt_stream;
   _log_format_string_args(fmt_stream, objs, fmt_str, 0,
@@ -372,6 +409,8 @@ inline void Logger<LogImpl>::warn(const T &t, LogFormat fmt) {
 template<class LogImpl>
 template<typename T>
 inline void Logger<LogImpl>::warn(const T &t) {
+  if (_log_output_lvl == LogOutputLevel::QUIET) return;
+
   std::lock_guard<std::mutex> lock(_mutex);
   _log_impl.log(*_stream, t, _log_format | _default_warn_fmt);
 }
@@ -386,6 +425,8 @@ template<class LogImpl>
 template<typename T, typename ...Tr>
 inline void Logger<LogImpl>::warn(const char *fmt_str, LogFormat fmt, T &&first,
                                   Tr&&... args) {
+  if (_log_output_lvl == LogOutputLevel::QUIET) return;
+
   std::vector<FormatStringObject> objs = _parse_format_string(fmt_str);
   std::stringstream fmt_stream;
   _log_format_string_args(fmt_stream, objs, fmt_str, 0,
@@ -399,6 +440,8 @@ inline void Logger<LogImpl>::warn(const char *fmt_str, LogFormat fmt, T &&first,
 template<class LogImpl>
 template<typename T>
 inline void Logger<LogImpl>::info(const T &t, LogFormat fmt) {
+  if (_log_output_lvl == LogOutputLevel::QUIET) return;
+
   std::lock_guard<std::mutex> lock(_mutex);
   _log_impl.log(*_stream, t, fmt | _default_info_fmt);
 }
@@ -419,6 +462,8 @@ template<class LogImpl>
 template<typename T, typename ...Tr>
 inline void Logger<LogImpl>::info(const char *fmt_str, LogFormat fmt, T &&first,
                                   Tr&&... args) {
+  if (_log_output_lvl == LogOutputLevel::QUIET) return;
+
   std::vector<FormatStringObject> objs = _parse_format_string(fmt_str);
   std::stringstream fmt_stream;
   _log_format_string_args(fmt_stream, objs, fmt_str, 0,
@@ -427,6 +472,49 @@ inline void Logger<LogImpl>::info(const char *fmt_str, LogFormat fmt, T &&first,
   std::lock_guard<std::mutex> lock(_mutex);
   _log_impl.parse_fmt_opts(*_stream, fmt_stream.rdbuf(),
                             fmt | _default_info_fmt);
+}
+
+template<class LogImpl>
+template<typename T>
+inline void Logger<LogImpl>::debug(const T &t, LogFormat fmt) {
+  if (_log_output_lvl != LogOutputLevel::DEBUG ||
+      _log_output_lvl == LogOutputLevel::QUIET) {
+    return;
+  }
+
+  std::lock_guard<std::mutex> lock(_mutex);
+  _log_impl.log(*_stream, t, fmt | _default_debug_fmt);
+}
+
+template<class LogImpl>
+template<typename T>
+inline void Logger<LogImpl>::debug(const T &t) {
+  debug(t, _log_format);
+}
+
+template<class LogImpl>
+template<typename ...T>
+inline void Logger<LogImpl>::debug(const char *fmt_str, T&&... args) {
+  debug(fmt_str, _log_format, std::forward<T>(args)...);
+}
+
+template<class LogImpl>
+template<typename T, typename ...Tr>
+inline void Logger<LogImpl>::debug(const char *fmt_str, LogFormat fmt,
+                                   T &&first, Tr&&... args) {
+  if (_log_output_lvl != LogOutputLevel::DEBUG ||
+      _log_output_lvl == LogOutputLevel::QUIET) {
+    return;
+  }
+
+  std::vector<FormatStringObject> objs = _parse_format_string(fmt_str);
+  std::stringstream fmt_stream;
+  _log_format_string_args(fmt_stream, objs, fmt_str, 0,
+                          objs.front().start_idx, 0, std::move(first),
+                          std::forward<Tr>(args)...);
+  std::lock_guard<std::mutex> lock(_mutex);
+  _log_impl.parse_fmt_opts(*_stream, fmt_stream.rdbuf(),
+                            fmt | _default_debug_fmt);
 }
 
 template<class LogImpl>

@@ -7,7 +7,8 @@ This logging library consists of only a single header file and can thus easily b
 
 ## Usage
 
-The logging is handled by the central `Logger` class. This class exposes the three main logging methods `info`, `warn` and `error`, which can be used to log any message or type to the default stream (`stderr`) in a thread-safe manner.
+The logging is handled by the central `Logger` class. This class exposes the three main logging methods `info`, `warn` and `error`, which can be used to log any message or type to any stream (default: `stderr`) in a thread-safe manner. It also provides a `debug` method, which is intended specifically for the logging of debug messages which can be turned on or off with with the `set_log_output_level` method of the class.
+
 Internally, the `Logger` class uses a `LogImpl` class to handle all of the actual logging.
 
 ### Logging of individual types/objects

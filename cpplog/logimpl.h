@@ -222,7 +222,7 @@ inline void LogImpl::log(std::ostream &stream, const std::pair<T, U> &p,
 inline void LogImpl::log(std::ostream &stream, const char *str, LogFormat fmt) {
   size_t str_len = std::strlen(str);
 
-  if (fmt & LogFormatOption::VERBOSE || str_len < CPPLOG_MX_STR_LEN) {
+  if (fmt & LogFormatOption::NO_SIZE_LIMIT || str_len < CPPLOG_MX_STR_LEN) {
     parse_fmt_opts(stream, str, fmt, str_len);
   } else {
     // if a string is longer than 20 characters,
@@ -263,7 +263,7 @@ inline void LogImpl::log(std::ostream &stream, const std::vector<T> &vec,
   size_t size = vec.size();
   size_t size_in_bytes = size * sizeof(T);
 
-  if (fmt & LogFormatOption::VERBOSE || size < CPPLOG_MX_ELS) {
+  if (fmt & LogFormatOption::NO_SIZE_LIMIT || size < CPPLOG_MX_ELS) {
     parse_fmt_opts(stream, vec, fmt, size_in_bytes);
   } else {
     // if a vector contains more than mx_size elements,
@@ -295,7 +295,7 @@ inline void LogImpl::log(std::ostream &stream, const std::array<T, SIZE> &arr,
   size_t size = arr.size();
   size_t size_in_bytes = size * sizeof(T);
 
-  if (fmt & LogFormatOption::VERBOSE || size < CPPLOG_MX_ELS) {
+  if (fmt & LogFormatOption::NO_SIZE_LIMIT || size < CPPLOG_MX_ELS) {
     parse_fmt_opts(stream, arr, fmt, size_in_bytes);
   } else {
     // if an array contains more than mx_size elements,
@@ -327,7 +327,7 @@ inline void LogImpl::log(std::ostream &stream, const std::map<K, V> &map,
   size_t size = map.size();
   size_t size_in_bytes = size * sizeof(K) + size * sizeof(V);  // estimate
 
-  if (fmt & LogFormatOption::VERBOSE || size < CPPLOG_MX_ELS) {
+  if (fmt & LogFormatOption::NO_SIZE_LIMIT || size < CPPLOG_MX_ELS) {
     parse_fmt_opts(stream, map, fmt, size_in_bytes);
   } else {
     // if a map contains more than mx_size key-value pairs,
@@ -367,7 +367,7 @@ inline void LogImpl::log(std::ostream &stream,
   size_t size = map.size();
   size_t size_in_bytes = size * sizeof(K) + size * sizeof(V);  // estimate
 
-  if (fmt & LogFormatOption::VERBOSE || size < CPPLOG_MX_ELS) {
+  if (fmt & LogFormatOption::NO_SIZE_LIMIT || size < CPPLOG_MX_ELS) {
     parse_fmt_opts(stream, map, fmt, size_in_bytes);
   } else {
     // if an unordered map contains more than mx_size key-value pairs,
