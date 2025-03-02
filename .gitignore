@@ -1,2 +1,4 @@
 # Files:
 lint.sh
+.gitignore
+.vscode
