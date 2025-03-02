@@ -23,6 +23,7 @@ enum FormatStringSpecifier {
   NONE           = '\0',
   INT            = 'd',
   FLOAT          = 'f',
+  HEX            = 'x',
   STRING         = 's',
   CHAR           = 'c',
   BOOL           = 'b',

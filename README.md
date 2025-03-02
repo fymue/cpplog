@@ -65,7 +65,7 @@ The supported format specifiers are:
 - '>' : any character put before '>' will be used to left-pad the to-be-printed type (if a max character size was also specified); '>' should be the 2nd character in the specified format
 - max character size: limit the number of characters the to-be-printed output can have; this number should be either the first number of the format or put after the '>' specifier (for left-padding)
 - '.' : specify the number of decimal places after a floating-point number after this character
-- 'd' | 'f' | 's' | 'o' | 'c' | 'b' : specify that the to-be-printed parameter is a decimal number, floating-point number, string, object, character or boolean
+- 'd' | 'f' | 'x' | 's' | 'o' | 'c' | 'b' : specify that the to-be-printed parameter is a decimal number, floating-point number, string, object, character or boolean
 - '<' : any character put after '<' will be used to right-pad the to-be-printed type (if a max character size was also specified); '>' should be the 2nd to last character in the specified format
 
 Please note that all types/objects passed that are supposed to be substituted in the format string must have an `operator<<` overload.

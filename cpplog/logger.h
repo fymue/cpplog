@@ -26,6 +26,7 @@
 #include <memory>
 #include <mutex>
 #include <iostream>
+#include <ios>
 #include <sstream>
 #include <fstream>
 #include <cstdint>
@@ -75,8 +76,6 @@ struct FormatStringObject {
   static inline void pad(std::ostream &stream, int n, char pad_chr);
 
   static bool is_number(char chr);
-
-  static std::string get_type(FormatStringSpecifier type);
 
   // parse a (multi-digit) number from format string
   static uint16_t get_number(const char *fmt_str, int &fmt_str_idx);
@@ -466,6 +465,9 @@ std::vector<FormatStringObject> Logger<LogImpl>::_parse_format_string(
         case FormatStringSpecifier::FLOAT :
           obj.type = FormatStringSpecifier::FLOAT;
           break;
+        case FormatStringSpecifier::HEX :
+          obj.type = FormatStringSpecifier::HEX;
+          break;
         case FormatStringSpecifier::STRING :
           obj.type = FormatStringSpecifier::STRING;
           break;
@@ -557,7 +559,11 @@ inline void Logger<LogImpl>::_log_fmt_arg(std::stringstream &fmt_arg, T &&_arg,
   // log the regular string part before the current format specifier
   for (int i = start_idx; i < end_idx; ++i) fmt_arg << log_fmt[i];
 
+  // convert input argument to string representation (determined by operator<<)
   std::stringstream tmp;
+  if (fmt_obj.type == FormatStringSpecifier::HEX) {
+    tmp << std::hex;
+  }
   tmp << _arg;
   std::string arg = tmp.str();
 
@@ -582,6 +588,9 @@ inline void Logger<LogImpl>::_log_fmt_arg(std::stringstream &fmt_arg, T &&_arg,
       _pad_fmt_arg(fmt_arg, arg, fmt_obj);
       break;
     }
+    case FormatStringSpecifier::HEX :
+      _pad_fmt_arg(fmt_arg, arg, fmt_obj);
+      break;
     case FormatStringSpecifier::STRING :
       _pad_fmt_arg(fmt_arg, arg, fmt_obj);
       break;
