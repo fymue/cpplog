@@ -307,19 +307,22 @@ inline size_t FormatStringObject::get_number(const char *fmt_str,
 template<class LogImpl>
 inline Logger<LogImpl>::Logger() :
    _name("LOG"), _log_lvl(LogVerboseLevel::STANDARD),
-   _log_format(LogVerboseLevel::STANDARD), _stream(&std::cerr) {
+   _log_format(LogVerboseLevel::STANDARD),
+   _log_output_lvl(LogOutputLevel::DEFAULT), _stream(&std::cerr) {
 }
 
 template<class LogImpl>
 inline Logger<LogImpl>::Logger(std::ostream &stream) :
   _name("LOG"), _log_lvl(LogVerboseLevel::STANDARD),
-  _log_format(LogVerboseLevel::STANDARD), _stream(&stream) {
+  _log_format(LogVerboseLevel::STANDARD),
+  _log_output_lvl(LogOutputLevel::DEFAULT), _stream(&stream) {
 }
 
 template<class LogImpl>
 inline Logger<LogImpl>::Logger(const char *name, const LogImpl &log_impl) :
    _name(name), _log_lvl(LogVerboseLevel::STANDARD),
-  _log_format(LogVerboseLevel::STANDARD), _stream(&std::cerr) {
+  _log_format(LogVerboseLevel::STANDARD),
+  _log_output_lvl(LogOutputLevel::DEFAULT), _stream(&std::cerr) {
   set_log_impl(log_impl);
 }
 
