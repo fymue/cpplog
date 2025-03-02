@@ -113,10 +113,12 @@ class Logger {
 
     Logger();
 
+    explicit Logger(std::ostream &stream);
+
     Logger(const char *name, const LogImpl &log_impl);
 
     Logger(const char *name, LogLevel lvl, LogFormat fmt,
-           const LogImpl &log_impl);
+           const LogImpl &log_impl, std::ostream &stream);
 
     ~Logger() {}
 
@@ -125,6 +127,9 @@ class Logger {
 
     // specify log format (see LogFormatOption enum for available options)
     void set_log_format(LogFormat fmt);
+
+    // set stream all log messages shall be written to
+    void set_stream(std::ostream &stream);
 
     /*
     * set the log implementation object;
@@ -219,7 +224,7 @@ class Logger {
                                 int obj_idx, T &&first, Tr &&...rest);
 
     LogLevel _log_lvl;
-    std::ostream &_stream;
+    std::ostream *_stream;
     std::string _name;
     LogFormat _log_format;
     LogImpl _log_impl;
@@ -259,7 +264,6 @@ inline bool FormatStringObject::is_number(char chr) {
   return !(chr < '0' || chr > '9');
 }
 
-// parse a (multi-digit) number from format string
 inline uint16_t FormatStringObject::get_number(const char *fmt_str,
                                                int &fmt_str_idx) {
   constexpr uint8_t MX_DIGITS = 3;
@@ -276,14 +280,21 @@ inline uint16_t FormatStringObject::get_number(const char *fmt_str,
 
 template<class LogImpl>
 inline Logger<LogImpl>::Logger() :
-  _stream(std::cerr), _name("LOG") {
+  _stream(&std::cerr), _name("LOG") {
+  set_log_level(LogLevel::STANDARD);
+  set_log_format(LogLevel::STANDARD);
+}
+
+template<class LogImpl>
+inline Logger<LogImpl>::Logger(std::ostream &stream) :
+  _name("LOG"), _stream(&stream) {
   set_log_level(LogLevel::STANDARD);
   set_log_format(LogLevel::STANDARD);
 }
 
 template<class LogImpl>
 inline Logger<LogImpl>::Logger(const char *name, const LogImpl &log_impl) :
-  _stream(std::cerr), _name(name) {
+  _stream(&std::cerr), _name(name) {
   set_log_level(LogLevel::STANDARD);
   set_log_format(LogLevel::STANDARD);
   set_log_impl(log_impl);
@@ -291,32 +302,29 @@ inline Logger<LogImpl>::Logger(const char *name, const LogImpl &log_impl) :
 
 template<class LogImpl>
 inline Logger<LogImpl>::Logger(const char *name, LogLevel lvl, LogFormat fmt,
-                     const LogImpl &log_impl) :
-  _log_lvl(lvl), _stream(std::cerr), _name(name), _log_format(fmt) {
+                               const LogImpl &log_impl, std::ostream &stream) :
+  _log_lvl(lvl), _stream(&stream), _name(name), _log_format(fmt) {
   set_log_level(lvl);
   set_log_format(fmt);
   set_log_impl(log_impl);
 }
 
-// set log level
 template<class LogImpl>
 inline void Logger<LogImpl>::set_log_level(LogLevel lvl) {
   _log_lvl = lvl;
   _log_format = _log_lvl;
 }
 
-// specify log format (see LogFormatOption enum for available options)
 template<class LogImpl>
 inline void Logger<LogImpl>::set_log_format(LogFormat fmt) {
   _log_format = fmt;
 }
 
-/*
-* set the log implementation object;
-* the Logger class will take ownership of the LogImpl object,
-* so be aware that it will be deleted whenever the Logger class
-* get deleted
-*/
+template<class LogImpl>
+inline void Logger<LogImpl>::set_stream(std::ostream &stream) {
+  _stream = &stream;
+}
+
 template<class LogImpl>
 inline void Logger<LogImpl>::set_log_impl(const LogImpl &log_impl) {
   _log_impl = log_impl;
@@ -327,7 +335,7 @@ template<class LogImpl>
 template<typename T>
 inline void Logger<LogImpl>::error(const T &t, LogFormat fmt) {
   std::lock_guard<std::mutex> lock(_mutex);
-  _log_impl.log(_stream, t, fmt | _default_err_fmt);
+  _log_impl.log(*_stream, t, fmt | _default_err_fmt);
 }
 
 template<class LogImpl>
@@ -336,14 +344,6 @@ inline void Logger<LogImpl>::error(const T &t) {
   error(t, _log_format);
 }
 
-/*
-* print args accoring to format specified by fmt_str;
-* the format string can parse decimal numbers, floating point numbers,
-* strings, objects and characters. Formatting can be specified in curly
-* brackets with Python/printf-like syntax:
-*   {_>10.2f} -> left-padded w/ '_', 10 chars, 2 decimal place float
-*   {0>8d< }   -> left-padded w/ '0, 8 chars, decimal, right-padded w/ ' '
-*/
 template<class LogImpl>
 template<typename ...T>
 inline void Logger<LogImpl>::error(const char *fmt_str, T&&... args) {
@@ -360,7 +360,7 @@ inline void Logger<LogImpl>::error(const char *fmt_str, LogFormat fmt,
                           objs.front().start_idx, 0, std::move(first),
                           std::forward<Tr>(args)...);
   std::lock_guard<std::mutex> lock(_mutex);
-  _log_impl.parse_fmt_opts(_stream, fmt_stream.rdbuf(),
+  _log_impl.parse_fmt_opts(*_stream, fmt_stream.rdbuf(),
                             fmt | _default_err_fmt);
 }
 
@@ -374,17 +374,9 @@ template<class LogImpl>
 template<typename T>
 inline void Logger<LogImpl>::warn(const T &t) {
   std::lock_guard<std::mutex> lock(_mutex);
-  _log_impl.log(_stream, t, _log_format | _default_warn_fmt);
+  _log_impl.log(*_stream, t, _log_format | _default_warn_fmt);
 }
 
-/*
-* print args accoring to format specified by fmt_str;
-* the format string can parse decimal numbers, floating point numbers,
-* strings, objects and characters. Formatting can be specified in curly
-* brackets with Python/printf-like syntax:
-*   {_>10.2f} -> left-padded w/ '_', 10 chars, 2 decimal place float
-*   {0>8d< }   -> left-padded w/ '0, 8 chars, decimal, right-padded w/ ' '
-*/
 template<class LogImpl>
 template<typename ...T>
 inline void Logger<LogImpl>::warn(const char *fmt_str, T&&... args) {
@@ -401,7 +393,7 @@ inline void Logger<LogImpl>::warn(const char *fmt_str, LogFormat fmt, T &&first,
                           objs.front().start_idx, 0, std::move(first),
                           std::forward<Tr>(args)...);
   std::lock_guard<std::mutex> lock(_mutex);
-  _log_impl.parse_fmt_opts(_stream, fmt_stream.rdbuf(),
+  _log_impl.parse_fmt_opts(*_stream, fmt_stream.rdbuf(),
                             fmt | _default_warn_fmt);
 }
 
@@ -409,7 +401,7 @@ template<class LogImpl>
 template<typename T>
 inline void Logger<LogImpl>::info(const T &t, LogFormat fmt) {
   std::lock_guard<std::mutex> lock(_mutex);
-  _log_impl.log(_stream, t, fmt | _default_info_fmt);
+  _log_impl.log(*_stream, t, fmt | _default_info_fmt);
 }
 
 template<class LogImpl>
@@ -418,14 +410,6 @@ inline void Logger<LogImpl>::info(const T &t) {
   info(t, _log_format);
 }
 
-/*
-* print args accoring to format specified by fmt_str;
-* the format string can parse decimal numbers, floating point numbers,
-* strings, objects and characters. Formatting can be specified in curly
-* brackets with Python/printf-like syntax:
-*   {_>10.2f} -> left-padded w/ '_', 10 chars, 2 decimal place float
-*   {0>8d< }   -> left-padded w/ '0, 8 chars, decimal, right-padded w/ ' '
-*/
 template<class LogImpl>
 template<typename ...T>
 inline void Logger<LogImpl>::info(const char *fmt_str, T&&... args) {
@@ -442,7 +426,7 @@ inline void Logger<LogImpl>::info(const char *fmt_str, LogFormat fmt, T &&first,
                           objs.front().start_idx, 0, std::move(first),
                           std::forward<Tr>(args)...);
   std::lock_guard<std::mutex> lock(_mutex);
-  _log_impl.parse_fmt_opts(_stream, fmt_stream.rdbuf(),
+  _log_impl.parse_fmt_opts(*_stream, fmt_stream.rdbuf(),
                             fmt | _default_info_fmt);
 }
 
@@ -525,7 +509,6 @@ std::vector<FormatStringObject> Logger<LogImpl>::_parse_format_string(
   return fmt_objs;
 }
 
-// handle max length and padding of to-be-printed format argument
 template<class LogImpl>
 inline void Logger<LogImpl>::_pad_fmt_arg(std::ostream &str,
   const std::string &arg, const FormatStringObject &fmt_obj) {
@@ -619,8 +602,6 @@ inline void Logger<LogImpl>::_log_fmt_arg(std::stringstream &fmt_arg, T &&_arg,
   }
 }
 
-// terminate the variadic argument recursion and print the rest of
-// the text in the format string after the last format specifier
 template<class LogImpl>
 inline void Logger<LogImpl>::_log_format_string_args(
   std::stringstream &fmt_stream,
@@ -650,23 +631,6 @@ inline void Logger<LogImpl>::_log_format_string_args(
                             fmt_objs[obj_idx + 1].start_idx, obj_idx + 1,
                             std::forward<Tr>(rest)...);
   }
-}
-
-// create a new Logger object and transfer ownership
-// of the Logger to the binding variable
-template<class LogImpl>
-inline Logger<LogImpl>* create_log(const char *name, const LogImpl &log_impl) {
-  return new Logger(name, log_impl);
-}
-
-// create a new Logger object with a custom LogImpl class
-// and transfer ownership of the Logger to the binding variable;
-// the Logger will take ownershio of the LogImpl object and delete
-// it when it gets deleted itself
-template<class LogImpl>
-inline Logger<LogImpl>* create_log(const char *name, LogLevel lvl,
-  LogFormat fmt, const LogImpl &log_impl) {
-  return new Logger(name, lvl, fmt, log_impl);
 }
 
 }  // namespace cpplog
