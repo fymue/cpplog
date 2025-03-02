@@ -124,10 +124,10 @@ class LogImpl {
     const char *__ansi_default = "\033[39m";
 
     // limit number of chars of logged string
-    const int CPPLOG_MX_STR_LEN = 50;
+    const size_t CPPLOG_MX_STR_LEN = 50;
 
     // limit number of elements of logged container
-    const int CPPLOG_MX_ELS     = 10;
+    const size_t CPPLOG_MX_ELS     = 10;
 
     // buffer for current time
     char time_str[sizeof("hh:mm:ss")];
@@ -251,8 +251,8 @@ inline void LogImpl::log(std::ostream &stream, const char *str, LogFormat fmt) {
     int pos = std::snprintf(formatted_str,
                             sizeof(formatted_str), "String: \"");
 
-    int mx_border = 8;
-    for (int i = 0; i < mx_border; ++i, ++pos) {
+    size_t mx_border = 8;
+    for (size_t i = 0; i < mx_border; ++i, ++pos) {
       formatted_str[pos] = str[i];
     }
 

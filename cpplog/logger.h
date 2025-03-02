@@ -77,14 +77,14 @@ struct FormatStringObject {
   static bool is_number(char chr);
 
   // parse a (multi-digit) number from format string
-  static uint16_t get_number(const char *fmt_str, int &fmt_str_idx);
+  static uint16_t get_number(const char *fmt_str, size_t &fmt_str_idx);
 
   FormatStringSpecifier type;
   char left_pad_chr, right_pad_chr;
   uint16_t mx_len, mx_decimal_places;
 
   // start and end idx of the format specifier in the format string
-  int start_idx, end_idx;
+  size_t start_idx, end_idx;
 };
 
 /*
@@ -233,21 +233,22 @@ class Logger {
     // the text in the format string after the last format specifier
     void _log_format_string_args(std::stringstream &fmt_stream,
                                 const std::vector<FormatStringObject> &fmt_objs,
-                                const char *fmt_str,
-                                int start_idx, int end_idx, int obj_idx);
+                                const char *fmt_str, size_t start_idx,
+                                size_t end_idx, size_t obj_idx);
 
     template<typename T, typename ...Tr>
     void _log_format_string_args(std::stringstream &fmt_stream,
                                 const std::vector<FormatStringObject> &fmt_objs,
-                                const char *fmt_str, int start_idx, int end_idx,
-                                int obj_idx, T &&first, Tr &&...rest);
+                                const char *fmt_str, size_t start_idx,
+                                size_t end_idx, size_t obj_idx, T &&first,
+                                Tr &&...rest);
 
-    LogVerboseLevel _log_lvl;
-    std::ostream *_stream;
     std::string _name;
+    LogVerboseLevel _log_lvl;
     LogFormat _log_format;
-    LogImpl _log_impl;
     LogOutputLevel _log_output_lvl;
+    LogImpl _log_impl;
+    std::ostream *_stream;
     std::mutex _mutex;
 
     // default log formats for error, warning and info messages
@@ -291,8 +292,8 @@ inline bool FormatStringObject::is_number(char chr) {
 }
 
 inline uint16_t FormatStringObject::get_number(const char *fmt_str,
-                                               int &fmt_str_idx) {
-  constexpr uint8_t MX_DIGITS = 3;
+                                               size_t &fmt_str_idx) {
+  const uint8_t MX_DIGITS = 3;
   char number[] = "0\0\0";
   int number_i = 0;
 
@@ -306,20 +307,20 @@ inline uint16_t FormatStringObject::get_number(const char *fmt_str,
 
 template<class LogImpl>
 inline Logger<LogImpl>::Logger() :
-  _stream(&std::cerr), _name("LOG"), _log_lvl(LogVerboseLevel::STANDARD),
-  _log_format(LogVerboseLevel::STANDARD) {
+   _name("LOG"), _log_lvl(LogVerboseLevel::STANDARD),
+   _log_format(LogVerboseLevel::STANDARD), _stream(&std::cerr) {
 }
 
 template<class LogImpl>
 inline Logger<LogImpl>::Logger(std::ostream &stream) :
-  _name("LOG"), _stream(&stream), _log_lvl(LogVerboseLevel::STANDARD),
-  _log_format(LogVerboseLevel::STANDARD) {
+  _name("LOG"), _log_lvl(LogVerboseLevel::STANDARD),
+  _log_format(LogVerboseLevel::STANDARD), _stream(&stream) {
 }
 
 template<class LogImpl>
 inline Logger<LogImpl>::Logger(const char *name, const LogImpl &log_impl) :
-  _stream(&std::cerr), _name(name), _log_lvl(LogVerboseLevel::STANDARD),
-  _log_format(LogVerboseLevel::STANDARD) {
+   _name(name), _log_lvl(LogVerboseLevel::STANDARD),
+  _log_format(LogVerboseLevel::STANDARD), _stream(&std::cerr) {
   set_log_impl(log_impl);
 }
 
@@ -529,7 +530,7 @@ inline std::vector<FormatStringObject> Logger<LogImpl>::_parse_format_string(
 
   size_t str_len = std::strlen(fmt_str);
 
-  for (int i = 0; i < str_len;) {
+  for (size_t i = 0; i < str_len;) {
     if (fmt_str[i] == FormatStringSpecifier::OPEN) {
       FormatStringObject obj;
       obj.start_idx = i;
@@ -707,9 +708,9 @@ inline void Logger<LogImpl>::_log_fmt_arg(std::stringstream &fmt_arg, T &&_arg,
 template<class LogImpl>
 inline void Logger<LogImpl>::_log_format_string_args(
   std::stringstream &fmt_stream,
-  const std::vector<FormatStringObject> &fmt_objs,
-  const char *fmt_str, int start_idx, int end_idx, int obj_idx) {
-  for (int i = start_idx; i < end_idx; ++i) fmt_stream << fmt_str[i];
+  const std::vector<FormatStringObject> &/*fmt_objs*/,
+  const char *fmt_str, size_t start_idx, size_t end_idx, size_t /*obj_idx*/) {
+  for (size_t i = start_idx; i < end_idx; ++i) fmt_stream << fmt_str[i];
 }
 
 template<class LogImpl>
@@ -717,7 +718,7 @@ template<typename T, typename ...Tr>
 inline void Logger<LogImpl>::_log_format_string_args(
   std::stringstream &fmt_stream,
   const std::vector<FormatStringObject> &fmt_objs, const char *fmt_str,
-  int start_idx, int end_idx, int obj_idx, T &&first, Tr &&...rest) {
+  size_t start_idx, size_t end_idx, size_t obj_idx, T &&first, Tr &&...rest) {
   _log_fmt_arg(fmt_stream, std::move(first), fmt_str,
               start_idx, end_idx, fmt_objs[obj_idx]);
 
