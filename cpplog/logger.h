@@ -281,7 +281,7 @@ inline FormatStringObject::FormatStringObject() :
 
 inline void FormatStringObject::pad(std::ostream &stream, size_t n,
                                    char pad_chr) {
-  for (int i = 0; i < n; ++i) {
+  for (size_t i = 0; i < n; ++i) {
     stream << pad_chr;
   }
 }
