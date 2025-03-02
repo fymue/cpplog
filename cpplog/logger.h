@@ -68,12 +68,11 @@ namespace cpplog {
 *     '>' should be the 2nd to last character in the specified format
 */
 struct FormatStringObject {
-
   FormatStringObject();
 
   ~FormatStringObject() {}
 
-  static inline void pad(std::ostream &stream, int n, char pad_chr);
+  static void pad(std::ostream &stream, int n, char pad_chr);
 
   static bool is_number(char chr);
 
@@ -107,9 +106,7 @@ struct FormatStringObject {
  */
 template<class LogImpl>
 class Logger {
-
   public:
-
     Logger();
 
     explicit Logger(std::ostream &stream);
@@ -117,7 +114,8 @@ class Logger {
     Logger(const char *name, const LogImpl &log_impl);
 
     Logger(const char *name, LogVerboseLevel lvl, LogFormat fmt,
-           LogOutputLevel outputLvl, const LogImpl &log_impl, std::ostream &stream);
+           LogOutputLevel outputLvl, const LogImpl &log_impl,
+           std::ostream &stream);
 
     ~Logger() {}
 
@@ -220,7 +218,6 @@ class Logger {
     void debug(const char *fmt_str, LogFormat fmt, T &&first, Tr&&... args);
 
   private:
-
     std::vector<FormatStringObject> _parse_format_string(const char *fmt_str);
 
     // handle max length and padding of to-be-printed format argument
@@ -391,10 +388,12 @@ inline void Logger<LogImpl>::error(const char *fmt_str, LogFormat fmt,
   if (_log_output_lvl == LogOutputLevel::QUIET) return;
 
   std::vector<FormatStringObject> objs = _parse_format_string(fmt_str);
+
   std::stringstream fmt_stream;
   _log_format_string_args(fmt_stream, objs, fmt_str, 0,
                           objs.front().start_idx, 0, std::move(first),
                           std::forward<Tr>(args)...);
+
   std::lock_guard<std::mutex> lock(_mutex);
   _log_impl.parse_fmt_opts(*_stream, fmt_stream.rdbuf(),
                             fmt | _default_err_fmt);
@@ -428,10 +427,12 @@ inline void Logger<LogImpl>::warn(const char *fmt_str, LogFormat fmt, T &&first,
   if (_log_output_lvl == LogOutputLevel::QUIET) return;
 
   std::vector<FormatStringObject> objs = _parse_format_string(fmt_str);
+
   std::stringstream fmt_stream;
   _log_format_string_args(fmt_stream, objs, fmt_str, 0,
                           objs.front().start_idx, 0, std::move(first),
                           std::forward<Tr>(args)...);
+
   std::lock_guard<std::mutex> lock(_mutex);
   _log_impl.parse_fmt_opts(*_stream, fmt_stream.rdbuf(),
                             fmt | _default_warn_fmt);
@@ -465,10 +466,12 @@ inline void Logger<LogImpl>::info(const char *fmt_str, LogFormat fmt, T &&first,
   if (_log_output_lvl == LogOutputLevel::QUIET) return;
 
   std::vector<FormatStringObject> objs = _parse_format_string(fmt_str);
+
   std::stringstream fmt_stream;
   _log_format_string_args(fmt_stream, objs, fmt_str, 0,
                           objs.front().start_idx, 0, std::move(first),
                           std::forward<Tr>(args)...);
+
   std::lock_guard<std::mutex> lock(_mutex);
   _log_impl.parse_fmt_opts(*_stream, fmt_stream.rdbuf(),
                             fmt | _default_info_fmt);
@@ -508,17 +511,19 @@ inline void Logger<LogImpl>::debug(const char *fmt_str, LogFormat fmt,
   }
 
   std::vector<FormatStringObject> objs = _parse_format_string(fmt_str);
+
   std::stringstream fmt_stream;
   _log_format_string_args(fmt_stream, objs, fmt_str, 0,
                           objs.front().start_idx, 0, std::move(first),
                           std::forward<Tr>(args)...);
+
   std::lock_guard<std::mutex> lock(_mutex);
   _log_impl.parse_fmt_opts(*_stream, fmt_stream.rdbuf(),
                             fmt | _default_debug_fmt);
 }
 
 template<class LogImpl>
-std::vector<FormatStringObject> Logger<LogImpl>::_parse_format_string(
+inline std::vector<FormatStringObject> Logger<LogImpl>::_parse_format_string(
   const char *fmt_str) {
   std::vector<FormatStringObject> fmt_objs;
 
@@ -648,7 +653,7 @@ inline void Logger<LogImpl>::_log_fmt_arg(std::stringstream &fmt_arg, T &&_arg,
   for (int i = start_idx; i < end_idx; ++i) fmt_arg << log_fmt[i];
 
   // convert input argument to string representation (determined by operator<<)
-  std::stringstream tmp;
+  std::ostringstream tmp;
   if (fmt_obj.type == FormatStringSpecifier::HEX) {
     tmp << std::hex;
   }

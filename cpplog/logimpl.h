@@ -1,3 +1,25 @@
+/*
+ Copyright (c) 2023 Fynn Mürmanns
+
+ Permission is hereby granted, free of charge, to any person obtaining a copy
+ of this software and associated documentation files (the "Software"), to deal
+ in the Software without restriction, including without limitation the rights
+ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ copies of the Software, and to permit persons to whom the Software is
+ furnished to do so, subject to the following conditions:
+
+ The above copyright notice and this permission notice shall be included in all
+ copies or substantial portions of the Software.
+
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ SOFTWARE.
+ */
+
 #ifndef CPPLOG_LOGIMPL_H_
 #define CPPLOG_LOGIMPL_H_
 
@@ -7,6 +29,7 @@
 #include <cstdint>
 #include <cstring>
 #include <ctime>
+#include <cstdio>
 #include <string>
 #include <vector>
 #include <array>
@@ -26,9 +49,7 @@ namespace cpplog {
  * call a "log" method of whatever LogImpl object it owns
  */
 class LogImpl {
-
   public:
-
     LogImpl() : start_time(std::time(nullptr)), name("") {}
 
     ~LogImpl() {}
@@ -89,14 +110,13 @@ class LogImpl {
 
     // log std::unordered_map
     template<typename K, typename V>
-    void log(std::ostream &stream,
-            const std::unordered_map<K, V> &map, LogFormat fmt);
+    void log(std::ostream &stream, const std::unordered_map<K, V> &map,
+             LogFormat fmt);
 
     template<typename T>
     void log(std::ostream &stream, const T &t, LogFormat fmt);
 
   private:
-
     // ANSI color codes for colorful logging
     const char *__ansi_red     = "\033[31m";
     const char *__ansi_green   = "\033[32m";
@@ -259,7 +279,7 @@ inline void LogImpl::log(std::ostream &stream, const std::string &str,
 
 template<typename T>
 inline void LogImpl::log(std::ostream &stream, const std::vector<T> &vec,
-                  LogFormat fmt) {
+                         LogFormat fmt) {
   size_t size = vec.size();
   size_t size_in_bytes = size * sizeof(T);
 
@@ -291,7 +311,7 @@ inline void LogImpl::log(std::ostream &stream, const std::vector<T> &vec,
 
 template<typename T, size_t SIZE>
 inline void LogImpl::log(std::ostream &stream, const std::array<T, SIZE> &arr,
-                  LogFormat fmt) {
+                         LogFormat fmt) {
   size_t size = arr.size();
   size_t size_in_bytes = size * sizeof(T);
 
@@ -323,7 +343,7 @@ inline void LogImpl::log(std::ostream &stream, const std::array<T, SIZE> &arr,
 
 template<typename K, typename V>
 inline void LogImpl::log(std::ostream &stream, const std::map<K, V> &map,
-                  LogFormat fmt) {
+                         LogFormat fmt) {
   size_t size = map.size();
   size_t size_in_bytes = size * sizeof(K) + size * sizeof(V);  // estimate
 
@@ -363,7 +383,7 @@ inline void LogImpl::log(std::ostream &stream, const std::map<K, V> &map,
 
 template<typename K, typename V>
 inline void LogImpl::log(std::ostream &stream,
-                        const std::unordered_map<K, V> &map, LogFormat fmt) {
+                         const std::unordered_map<K, V> &map, LogFormat fmt) {
   size_t size = map.size();
   size_t size_in_bytes = size * sizeof(K) + size * sizeof(V);  // estimate
 
