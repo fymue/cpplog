@@ -72,16 +72,16 @@ struct FormatStringObject {
 
   ~FormatStringObject() {}
 
-  static void pad(std::ostream &stream, int n, char pad_chr);
+  static void pad(std::ostream &stream, size_t n, char pad_chr);
 
   static bool is_number(char chr);
 
   // parse a (multi-digit) number from format string
-  static uint16_t get_number(const char *fmt_str, size_t &fmt_str_idx);
+  static size_t get_number(const char *fmt_str, size_t &fmt_str_idx);
 
   FormatStringSpecifier type;
   char left_pad_chr, right_pad_chr;
-  uint16_t mx_len, mx_decimal_places;
+  size_t mx_len, mx_decimal_places;
 
   // start and end idx of the format specifier in the format string
   size_t start_idx, end_idx;
@@ -226,7 +226,7 @@ class Logger {
 
     template<typename T>
     void _log_fmt_arg(std::stringstream &fmt_arg, T &&_arg,
-                      const char *log_fmt, int start_idx, int end_idx,
+                      const char *log_fmt, size_t start_idx, size_t end_idx,
                       const FormatStringObject &fmt_obj);
 
     // terminate the variadic argument recursion and print the rest of
@@ -279,9 +279,8 @@ inline FormatStringObject::FormatStringObject() :
   mx_len(0), mx_decimal_places(0), start_idx(0), end_idx(0) {
 }
 
-inline void FormatStringObject::pad(std::ostream &stream, int n, char pad_chr) {
-  if (n < 0) return;
-
+inline void FormatStringObject::pad(std::ostream &stream, size_t n,
+                                   char pad_chr) {
   for (int i = 0; i < n; ++i) {
     stream << pad_chr;
   }
@@ -291,7 +290,7 @@ inline bool FormatStringObject::is_number(char chr) {
   return !(chr < '0' || chr > '9');
 }
 
-inline uint16_t FormatStringObject::get_number(const char *fmt_str,
+inline size_t FormatStringObject::get_number(const char *fmt_str,
                                                size_t &fmt_str_idx) {
   const uint8_t MX_DIGITS = 3;
   char number[] = "0\0\0";
@@ -302,7 +301,7 @@ inline uint16_t FormatStringObject::get_number(const char *fmt_str,
     number[number_i++] = fmt_str[fmt_str_idx++];
   }
 
-  return static_cast<uint16_t>(std::stoi(number));
+  return static_cast<size_t>(std::stoi(number));
 }
 
 template<class LogImpl>
@@ -609,18 +608,18 @@ template<class LogImpl>
 inline void Logger<LogImpl>::_pad_fmt_arg(std::ostream &str,
   const std::string &arg, const FormatStringObject &fmt_obj) {
   size_t str_len = arg.size();       // length of to-be-printed string arg
-  uint16_t mx_len = fmt_obj.mx_len;  // max length of to-be-printed arg
+  size_t mx_len = fmt_obj.mx_len;  // max length of to-be-printed arg
   if (mx_len) {
     if (mx_len < str_len) {
       // no space for padding -> just print string until max is reached
-      for (uint16_t i = 0; i < mx_len; ++i) str << arg[i];
+      for (size_t i = 0; i < mx_len; ++i) str << arg[i];
     } else {
       // if left- AND right-padding was specified in the format,
       // distribute the padding equally between left and right
       // (left will be preferred if the max padding number is uneven)
-      uint16_t mx_padding = mx_len - str_len;
-      uint16_t mx_right_padding = mx_padding / 2;
-      uint16_t mx_left_padding = mx_padding - mx_right_padding;
+      size_t mx_padding = mx_len - str_len;
+      size_t mx_right_padding = mx_padding / 2;
+      size_t mx_left_padding = mx_padding - mx_right_padding;
 
       mx_left_padding = mx_padding > 0 && fmt_obj.right_pad_chr != '\0' ?
                           mx_left_padding: mx_padding;
@@ -648,10 +647,10 @@ inline void Logger<LogImpl>::_pad_fmt_arg(std::ostream &str,
 template<class LogImpl>
 template<typename T>
 inline void Logger<LogImpl>::_log_fmt_arg(std::stringstream &fmt_arg, T &&_arg,
-  const char *log_fmt, int start_idx, int end_idx,
+  const char *log_fmt, size_t start_idx, size_t end_idx,
   const FormatStringObject &fmt_obj) {
   // log the regular string part before the current format specifier
-  for (int i = start_idx; i < end_idx; ++i) fmt_arg << log_fmt[i];
+  for (size_t i = start_idx; i < end_idx; ++i) fmt_arg << log_fmt[i];
 
   // convert input argument to string representation (determined by operator<<)
   std::ostringstream tmp;
