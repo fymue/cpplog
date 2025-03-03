@@ -40,6 +40,22 @@
 
 namespace cpplog {
 
+template<typename T>
+std::ostream &operator<<(std::ostream &stream, const std::vector<T> &vec);
+
+template<typename T, size_t SIZE>
+std::ostream &operator<<(std::ostream &stream, const std::array<T, SIZE> &arr);
+
+template<typename K, typename V>
+std::ostream &operator<<(std::ostream &stream, const std::map<K, V> &map);
+
+template<typename K, typename V>
+std::ostream &operator<<(
+  std::ostream &stream, const std::unordered_map<K, V> &map);
+
+template<typename T, typename U>
+std::ostream &operator<<(std::ostream &stream, const std::pair<T, U> &pair);
+
 /*
  * specifies how a certain datatype should be logged;
  * defines a "inline void log(std::ostream &stream, CustomType t, LogFormat fmt)"
@@ -124,10 +140,10 @@ class LogImpl {
     const char *__ansi_default = "\033[39m";
 
     // limit number of chars of logged string
-    const size_t CPPLOG_MX_STR_LEN = 50;
+    static const size_t CPPLOG_MX_STR_LEN = 50;
 
     // limit number of elements of logged container
-    const size_t CPPLOG_MX_ELS     = 10;
+    static const size_t CPPLOG_MX_ELS     = 10;
 
     // buffer for current time
     char time_str[sizeof("hh:mm:ss")];
@@ -180,12 +196,22 @@ inline void LogImpl::parse_fmt_opts(std::ostream &stream, const T &t,
   if (log_name && log_timestamp) {
     stream << "[" << name << ", " << time_str << "] ";
   } else {
-    if (fmt & LogFormatOption::NAME) {
+    if (log_name) {
       stream << "[" << name << "] ";
     }
-    if (fmt & LogFormatOption::TIMESTAMP) {
+    if (log_timestamp) {
       stream << "[" << time_str << "] ";
     }
+  }
+
+  if (fmt & LogFormatOption::ERROR_STRING) {
+    stream << "Error: ";
+  } else if (fmt & LogFormatOption::WARNING_STRING) {
+    stream << "Warning: ";
+  } else if (fmt & LogFormatOption::INFO_STRING) {
+    stream << "Info: ";
+  } else if (fmt & LogFormatOption::DEBUG_STRING) {
+    stream << "Debug: ";
   }
 
   // add type to stream (without any special formatting)
@@ -235,7 +261,7 @@ inline void LogImpl::log(std::ostream &stream, bool b, LogFormat fmt) {
 
 template<typename T, typename U>
 inline void LogImpl::log(std::ostream &stream, const std::pair<T, U> &p,
-                  LogFormat fmt) {
+                         LogFormat fmt) {
   parse_fmt_opts(stream, p, fmt);
 }
 
@@ -431,7 +457,7 @@ inline void LogImpl::log(std::ostream &stream, const T &t, LogFormat fmt) {
 // ### operator<< overloads for most std library types ###
 
 template<typename T>
-static std::ostream &operator<<(std::ostream &stream,
+inline std::ostream &operator<<(std::ostream &stream,
                                 const std::vector<T> &vec) {
   if (vec.empty()) {
     stream << "vector: [] ";
@@ -448,7 +474,7 @@ static std::ostream &operator<<(std::ostream &stream,
 }
 
 template<typename T, size_t SIZE>
-static std::ostream &operator<<(std::ostream &stream,
+inline std::ostream &operator<<(std::ostream &stream,
                                 const std::array<T, SIZE> &arr) {
   if (arr.empty()) {
     stream << "array: [] ";
@@ -465,7 +491,7 @@ static std::ostream &operator<<(std::ostream &stream,
 }
 
 template<typename K, typename V>
-static std::ostream &operator<<(std::ostream &stream,
+inline std::ostream &operator<<(std::ostream &stream,
                                 const std::map<K, V> &map) {
   if (map.empty()) {
     stream << "map: {} ";
@@ -487,7 +513,7 @@ static std::ostream &operator<<(std::ostream &stream,
 }
 
 template<typename K, typename V>
-static std::ostream &operator<<(std::ostream &stream,
+inline std::ostream &operator<<(std::ostream &stream,
                                 const std::unordered_map<K, V> &map) {
   if (map.empty()) {
     stream << "unordered_map: {} ";
@@ -509,7 +535,7 @@ static std::ostream &operator<<(std::ostream &stream,
 }
 
 template<typename T, typename U>
-static std::ostream &operator<<(std::ostream &stream,
+inline std::ostream &operator<<(std::ostream &stream,
                                 const std::pair<T, U> &pair) {
   stream << "pair: {" << pair.first << ", " << pair.second << "} ";
   return stream;

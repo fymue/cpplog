@@ -31,15 +31,19 @@ typedef uint64_t LogFormat;
 
 // available format flags for a log message
 enum LogFormatOption {
-  NEWLINE          = 1 << 0,  // append newline at the end of the log msg
-  TIMESTAMP        = 1 << 1,  // add system time at the beginning of log msg
-  HIGHLIGHT_RED    = 1 << 2,  // highlight the log msg red
-  HIGHLIGHT_GREEN  = 1 << 3,  // highlight the log msg green
-  HIGHLIGHT_YELLOW = 1 << 4,  // highlight the log msg yellow
-  HIGHLIGHT_DEF    = 1 << 5,  // use default terminal color for log msg
-  NO_SIZE_LIMIT    = 1 << 6,  // print entire content (for container-like)
-  TYPE_SIZE        = 1 << 7,  // print (estimated) size of type
-  NAME             = 1 << 8,  // print name of Logger
+  NEWLINE          = 1 << 0,   // append newline at the end of the log msg
+  TIMESTAMP        = 1 << 1,   // add system time at the beginning of log msg
+  HIGHLIGHT_RED    = 1 << 2,   // highlight the log msg red
+  HIGHLIGHT_GREEN  = 1 << 3,   // highlight the log msg green
+  HIGHLIGHT_YELLOW = 1 << 4,   // highlight the log msg yellow
+  HIGHLIGHT_DEF    = 1 << 5,   // use default terminal color for log msg
+  NO_SIZE_LIMIT    = 1 << 6,   // print entire content (for container-like)
+  TYPE_SIZE        = 1 << 7,   // print (estimated) size of type
+  NAME             = 1 << 8,   // print name of Logger
+  INFO_STRING      = 1 << 9,   // add "Info" to beginning of log message
+  WARNING_STRING   = 1 << 10,  // add "Warning" to beginning of log message
+  ERROR_STRING     = 1 << 11,  // add "Error" to beginning of log message
+  DEBUG_STRING     = 1 << 12   // add "Debug" to beginning of log message
 };
 
 // defined loggable specifiers for format string of a log message
@@ -61,7 +65,7 @@ enum FormatStringSpecifier {
 
 // available log levels (also compliant with a valid log format)
 enum LogVerboseLevel {
-  STANDARD = LogFormatOption::NEWLINE | LogFormatOption::TIMESTAMP,
+  STANDARD = LogFormatOption::NEWLINE   | LogFormatOption::TIMESTAMP,
   VERBOSE  = LogFormatOption::NEWLINE   | LogFormatOption::TIMESTAMP |
              LogFormatOption::TYPE_SIZE | LogFormatOption::NAME
 };
