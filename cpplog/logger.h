@@ -420,13 +420,14 @@ inline void Logger<LogImpl>::error(LogFormat fmt, const T &t) {
 template<class LogImpl>
 template<typename T>
 inline void Logger<LogImpl>::error(const T &t) {
-  error(_err_log_fmt | _log_verbose_lvl, t);
+  error(_err_log_fmt | static_cast<LogFormat>(_log_verbose_lvl), t);
 }
 
 template<class LogImpl>
 template<typename ...T>
 inline void Logger<LogImpl>::error(const char *fmt_str, T&&... args) {
-  error(_err_log_fmt | _log_verbose_lvl, fmt_str, std::forward<T>(args)...);
+  error(_err_log_fmt | static_cast<LogFormat>(_log_verbose_lvl), fmt_str,
+    std::forward<T>(args)...);
 }
 
 template<class LogImpl>
@@ -458,13 +459,14 @@ inline void Logger<LogImpl>::warn(LogFormat fmt, const T &t) {
 template<class LogImpl>
 template<typename T>
 inline void Logger<LogImpl>::warn(const T &t) {
-  warn(_warn_log_fmt | _log_verbose_lvl, t);
+  warn(_warn_log_fmt | static_cast<LogFormat>(_log_verbose_lvl), t);
 }
 
 template<class LogImpl>
 template<typename ...T>
 inline void Logger<LogImpl>::warn(const char *fmt_str, T&&... args) {
-  warn(_warn_log_fmt | _log_verbose_lvl, fmt_str, std::forward<T>(args)...);
+  warn(_warn_log_fmt | static_cast<LogFormat>(_log_verbose_lvl), fmt_str,
+    std::forward<T>(args)...);
 }
 
 template<class LogImpl>
@@ -496,13 +498,14 @@ inline void Logger<LogImpl>::info(LogFormat fmt, const T &t) {
 template<class LogImpl>
 template<typename T>
 inline void Logger<LogImpl>::info(const T &t) {
-  info(_info_log_fmt | _log_verbose_lvl, t);
+  info(_info_log_fmt | static_cast<LogFormat>(_log_verbose_lvl), t);
 }
 
 template<class LogImpl>
 template<typename ...T>
 inline void Logger<LogImpl>::info(const char *fmt_str, T&&... args) {
-  info(_info_log_fmt | _log_verbose_lvl, fmt_str, std::forward<T>(args)...);
+  info(_info_log_fmt | static_cast<LogFormat>(_log_verbose_lvl), fmt_str,
+    std::forward<T>(args)...);
 }
 
 template<class LogImpl>
@@ -537,13 +540,14 @@ inline void Logger<LogImpl>::debug(LogFormat fmt, const T &t) {
 template<class LogImpl>
 template<typename T>
 inline void Logger<LogImpl>::debug(const T &t) {
-  debug(t, _debug_log_fmt | _log_verbose_lvl);
+  debug(t, _debug_log_fmt | static_cast<LogFormat>(_log_verbose_lvl));
 }
 
 template<class LogImpl>
 template<typename ...T>
 inline void Logger<LogImpl>::debug(const char *fmt_str, T&&... args) {
-  debug(_debug_log_fmt | _log_verbose_lvl, fmt_str, std::forward<T>(args)...);
+  debug(_debug_log_fmt | static_cast<LogFormat>(_log_verbose_lvl), fmt_str,
+    std::forward<T>(args)...);
 }
 
 template<class LogImpl>
